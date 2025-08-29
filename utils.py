@@ -3,28 +3,119 @@ Blood Cell Detection Utilities - BloodCellAI
 Utility functions for blood smear analysis, cell detection, and report generation
 """
 
+# Standard library imports
 import os
+import time
+import tempfile
+import glob
+from typing import Dict, List, Any, Optional
+
+# Handle all optional imports with try-except
+REQUIRED_PACKAGES = {}
+
+try:
+    import numpy as np
+    REQUIRED_PACKAGES['numpy'] = True
+except ImportError:
+    REQUIRED_PACKAGES['numpy'] = False
+    print("Warning: numpy not found. Install with: pip install numpy")
+
+try:
+    import cv2
+    REQUIRED_PACKAGES['cv2'] = True
+except ImportError:
+    REQUIRED_PACKAGES['cv2'] = False
+    print("Warning: opencv-python not found. Install with: pip install opencv-python-headless")
+
+try:
+    import torch
+    from torchvision import transforms
+    REQUIRED_PACKAGES['torch'] = True
+except ImportError:
+    REQUIRED_PACKAGES['torch'] = False
+    print("Warning: torch/torchvision not found. Install with: pip install torch torchvision")
+
+try:
+    from PIL import Image, ImageFilter, ImageEnhance
+    REQUIRED_PACKAGES['PIL'] = True
+except ImportError:
+    REQUIRED_PACKAGES['PIL'] = False
+    print("Warning: Pillow not found. Install with: pip install Pillow")
+
+try:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    REQUIRED_PACKAGES['viz'] = True
+except ImportError:
+    REQUIRED_PACKAGES['viz'] = False
+    print("Warning: matplotlib/seaborn not found. Install with: pip install matplotlib seaborn")
+
+try:
+    import streamlit as st
+    REQUIRED_PACKAGES['streamlit'] = True
+except ImportError:
+    REQUIRED_PACKAGES['streamlit'] = False
+    print("Warning: streamlit not found. Install with: pip install streamlit")
+
+try:
+    from lime import lime_image
+    LIME_AVAILABLE = True
+except ImportError:
+    LIME_AVAILABLE = False
+    print("Warning: lime not found. Install with: pip install lime")
+
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except ImportError:
+    SHAP_AVAILABLE = False
+    print("Warning: shap not found. Install with: pip install shap")
+
+# Additional ML imports
+try:
+    import pandas as pd
+    from sklearn.metrics import precision_recall_curve
+    from sklearn.model_selection import train_test_split
+    REQUIRED_PACKAGES['ml'] = True
+except ImportError:
+    REQUIRED_PACKAGES['ml'] = False
+    print("Warning: pandas/scikit-learn not found. Install with: pip install pandas scikit-learn")
+
+# Report generation
+from fpdf import FPDF
+
+# Third-party imports
 import streamlit as st
-import torch
 import numpy as np
+import pandas as pd
+import torch
 from PIL import Image, ImageFilter, ImageEnhance
 from torchvision import transforms
 import cv2
-import time
-import random
-from typing import Dict, List, Any, Optional
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import precision_recall_curve
-import pandas as pd
 from fpdf import FPDF
-import tempfile
-import uuid
-import glob
+try:
+    import lime
+    from lime import lime_image
+    LIME_AVAILABLE = True
+except ImportError:
+    LIME_AVAILABLE = False
+
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except ImportError:
+    SHAP_AVAILABLE = False
 
 # LangChain imports
-from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, AIMessage
+try:
+    from langchain_groq import ChatGroq
+    from langchain_core.messages import HumanMessage, AIMessage
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
 
 def retry_with_exponential_backoff(func, max_retries=4, base_delay=2):
     """
@@ -71,9 +162,21 @@ def load_models():
         print(f"Error loading BLIP models: {e}")
         return None, None
 
-def check_image_quality(image: Image.Image, suspected_disease: str = None) -> float:
+def check_requirements():
+    """Check if all required packages are installed"""
+    missing_packages = [pkg for pkg, available in REQUIRED_PACKAGES.items() if not available]
+    if missing_packages:
+        print("Warning: The following required packages are missing:")
+        for pkg in missing_packages:
+            print(f"  - {pkg}")
+        print("\nPlease install missing packages with:")
+        print("pip install numpy opencv-python-headless torch torchvision Pillow streamlit matplotlib seaborn scikit-learn pandas")
+        return False
+    return True
+
+def check_image_quality(image: Image.Image) -> float:
     """
-    Check image quality for skin disease detection
+    Check image quality for blood cell detection
     Returns a quality score between 0 and 1
     """
     try:
@@ -557,10 +660,42 @@ def gradient_text(text, color1, color2):
     return f'<span style="background: linear-gradient(45deg, {color1}, {color2}); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold;">{text}</span>'
 
 def validate_dataset(dataset_dir):
-    """Validate skin disease dataset structure"""
+    """Validate blood cell detection dataset structure"""
+    if not dataset_dir or not os.path.exists(dataset_dir):
+        return False, f"Dataset directory {dataset_dir} does not exist"
+    
+    required_dirs = ['train', 'valid', 'test']
+    required_subdirs = ['images', 'labels']
+    
     try:
-        if not os.path.exists(dataset_dir):
-            return False, f"Dataset directory '{dataset_dir}' not found"
+        # Check for required directories
+        for dir_name in required_dirs:
+            dir_path = os.path.join(dataset_dir, dir_name)
+            if not os.path.exists(dir_path):
+                return False, f"Missing required directory: {dir_name}"
+            
+            # Check for images and labels subdirectories
+            for subdir in required_subdirs:
+                subdir_path = os.path.join(dir_path, subdir)
+                if not os.path.exists(subdir_path):
+                    return False, f"Missing required subdirectory: {dir_name}/{subdir}"
+                
+                # Check if images directory contains files
+                if subdir == 'images':
+                    image_files = [f for f in os.listdir(subdir_path) 
+                                 if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+                    if not image_files:
+                        return False, f"No images found in {dir_name}/{subdir}"
+        
+        # Validate data.yaml
+        yaml_path = os.path.join(dataset_dir, 'data.yaml')
+        if not os.path.exists(yaml_path):
+            return False, "data.yaml file not found"
+        
+        return True, "Dataset structure is valid"
+    
+    except Exception as e:
+        return False, f"Error validating dataset: {str(e)}"
         
         # Define valid skin disease classes (exclude data split folders)
         valid_disease_classes = {
@@ -605,25 +740,42 @@ def validate_dataset(dataset_dir):
     except Exception as e:
         return False, f"Dataset validation error: {str(e)}"
 
-def preprocess_image(img_path, output_path):
-    """Preprocess skin images for better disease detection"""
+def preprocess_image(img_path, output_path=None):
+    """
+    Preprocess blood cell images for better detection.
+    Applies color normalization and contrast enhancement specifically for blood smear images.
+    """
     try:
+        # Load image
         img = Image.open(img_path).convert('RGB')
-        
-        # Apply CLAHE for better contrast
         img_array = np.array(img)
+
+        # Convert to LAB color space for better color processing
         lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+
+        # Apply CLAHE to L channel for better contrast
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
         lab[:,:,0] = clahe.apply(lab[:,:,0])
+
+        # Convert back to RGB
         enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
-        
-        # Convert back to PIL
-        enhanced_img = Image.fromarray(enhanced)
-        enhanced_img.save(output_path, quality=95)
-        return True
+
+        # Color normalization specific to blood cells
+        # Helps in distinguishing between different cell types
+        enhanced_norm = cv2.normalize(enhanced, None, alpha=0, beta=255, 
+                                    norm_type=cv2.NORM_MINMAX)
+
+        # Convert back to PIL image
+        enhanced_img = Image.fromarray(enhanced_norm)
+
+        if output_path:
+            enhanced_img.save(output_path, quality=95)
+            return True
+        return enhanced_img
+
     except Exception as e:
         print(f"Error preprocessing image: {e}")
-        return False
+        return None
 
 def augment_with_blur(img_path, output_path, blur_radius=2):
     """Create blurred version for data augmentation"""
@@ -707,11 +859,12 @@ def clear_mps_cache():
         torch.mps.empty_cache()
 
 def get_image_transform():
-    """Get image transformation for skin disease detection"""
+    """Get image transformation for blood cell detection"""
     return transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((640, 640)),  # YOLO typical input size
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                          std=[0.229, 0.224, 0.225])
     ])
 
 def create_dataset_splits(dataset_dir, split_ratio=(0.7, 0.15, 0.15)):

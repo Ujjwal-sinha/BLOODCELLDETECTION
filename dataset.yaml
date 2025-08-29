@@ -1,6 +1,6 @@
 
-# Fracture Classification Dataset Configuration
-path: /kaggle/input/blood-cell-detection-datatset
+# Blood Cell Detection Dataset Configuration
+path: /Users/ujjwalsinha/Blood Cell Detection/dataset
 train: train/images
 val: valid/images
 test: test/images

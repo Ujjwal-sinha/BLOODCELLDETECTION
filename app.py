@@ -85,17 +85,16 @@ if not is_valid:
     st.error(f"Dataset validation failed: {message}")
     st.stop()
 
-# Get classes from dataset
-classes = []
-# Define valid skin disease classes (exclude data split folders)
-valid_disease_classes = {
-    'actinic_keratosis', 'atopic_dermatitis', 'benign_keratosis', 'dermatofibroma',
-    'melanocytic_nevus', 'melanoma', 'squamous_cell_carcinoma', 
-    'tinea_ringworm_candidiasis', 'vascular_lesion', 'healthy'
-}
+# Define blood cell classes
+classes = ['RBC', 'WBC', 'Platelets']
 
-# Get all subdirectories in the Dataset folder
+# Validate dataset structure
 if os.path.exists(dataset_dir):
+    is_valid, message = validate_dataset(dataset_dir)
+    if not is_valid:
+        st.error(f"❌ {message}")
+        st.stop()
+    st.success(f"✅ Dataset validated successfully: Found {len(classes)} cell types")
     for item in os.listdir(dataset_dir):
         item_path = os.path.join(dataset_dir, item)
         if os.path.isdir(item_path):
