@@ -88,23 +88,29 @@ if not is_valid:
 # Define blood cell classes
 classes = ['RBC', 'WBC', 'Platelets']
 
+# Define blood cell classes
+blood_cell_classes = ['RBC', 'WBC', 'Platelets']
+
 # Validate dataset structure
 if os.path.exists(dataset_dir):
     is_valid, message = validate_dataset(dataset_dir)
     if not is_valid:
         st.error(f"❌ {message}")
         st.stop()
+        
+    # Read classes from data.yaml
+    import yaml
+    try:
+        with open(os.path.join(dataset_dir, 'data.yaml'), 'r') as f:
+            data_yaml = yaml.safe_load(f)
+            if 'names' in data_yaml:
+                classes = [str(name) for name in data_yaml['names'].values()]
+            else:
+                classes = blood_cell_classes
+    except Exception as e:
+        classes = blood_cell_classes
+    
     st.success(f"✅ Dataset validated successfully: Found {len(classes)} cell types")
-    for item in os.listdir(dataset_dir):
-        item_path = os.path.join(dataset_dir, item)
-        if os.path.isdir(item_path):
-            # Only include if it's a valid disease class or has a similar name
-            item_lower = item.lower().replace(' ', '_')
-            if (item_lower in valid_disease_classes or 
-                any(disease in item_lower for disease in valid_disease_classes) or
-                (item_lower not in ['train', 'val', 'test', 'validation', 'training'] and 
-                 not item_lower.startswith('val') and not item_lower.startswith('train'))):
-                classes.append(item)
 else:
     st.error(f"Dataset directory '{dataset_dir}' not found")
     st.stop()

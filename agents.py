@@ -50,148 +50,249 @@ def retry_with_exponential_backoff(func, max_retries=3, base_delay=1):
             print(f"GROQ API over capacity, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries + 1})")
             time.sleep(delay)
 
-# Skin disease knowledge base
-SKIN_DISEASE_KNOWLEDGE = {
-    "healthy": {
-        "symptoms": ["normal skin color", "uniform texture", "no lesions or spots"],
-        "characteristics": ["even skin tone", "smooth texture", "normal pigmentation"],
-        "recommendations": ["maintain current skincare routine", "regular monitoring", "preventive measures"]
+# Blood cell knowledge base
+BLOOD_CELL_KNOWLEDGE = {
+    "RBC": {
+        "characteristics": ["round biconcave disk", "red color", "no nucleus"],
+        "normal_count": "4.5-5.5 million cells/microliter",
+        "function": ["oxygen transport", "carbon dioxide transport"],
+        "abnormalities": {
+            "low": ["anemia", "blood loss", "malnutrition"],
+            "high": ["polycythemia", "dehydration", "lung disease"]
+        },
+        "severity_indicators": {
+            "shape": ["normal", "sickle", "spherical", "elliptical"],
+            "size": ["normal", "microcytic", "macrocytic"],
+            "color": ["normal", "hypochromic", "hyperchromic"]
+        }
     },
-    "actinic_keratosis": {
-        "symptoms": ["rough scaly patches", "pink or red base", "crusty lesions"],
-        "causes": ["sun damage", "UV radiation", "fair skin"],
-        "treatments": ["cryotherapy", "topical medications", "photodynamic therapy"],
-        "severity": "moderate"
+    "WBC": {
+        "characteristics": ["has nucleus", "irregular shape", "larger than RBC"],
+        "normal_count": "4,500-11,000 cells/microliter",
+        "types": {
+            "neutrophils": {
+                "appearance": "multi-lobed nucleus",
+                "function": "bacterial infection defense"
+            },
+            "lymphocytes": {
+                "appearance": "round nucleus",
+                "function": "immune response"
+            },
+            "monocytes": {
+                "appearance": "kidney-shaped nucleus",
+                "function": "phagocytosis"
+            },
+            "eosinophils": {
+                "appearance": "bi-lobed nucleus",
+                "function": "allergy response"
+            },
+            "basophils": {
+                "appearance": "s-shaped nucleus",
+                "function": "inflammatory response"
+            }
+        },
+        "abnormalities": {
+            "low": ["immunodeficiency", "bone marrow problems"],
+            "high": ["infection", "inflammation", "leukemia"]
+        }
     },
-    "atopic_dermatitis": {
-        "symptoms": ["red itchy patches", "dry scaly skin", "cracked skin"],
-        "causes": ["genetic factors", "environmental triggers", "immune system"],
-        "treatments": ["moisturizers", "topical steroids", "avoiding triggers"],
-        "severity": "moderate"
-    },
-    "benign_keratosis": {
-        "symptoms": ["brown or black spots", "waxy appearance", "stuck-on look"],
-        "causes": ["aging", "sun exposure", "genetic factors"],
-        "treatments": ["cryotherapy", "curettage", "laser therapy"],
-        "severity": "low"
-    },
-    "dermatofibroma": {
-        "symptoms": ["firm brown nodules", "dimpling when pinched", "slow growing"],
-        "causes": ["minor trauma", "insect bites", "unknown"],
-        "treatments": ["surgical removal", "laser therapy", "observation"],
-        "severity": "low"
-    },
-    "melanocytic_nevus": {
-        "symptoms": ["brown or black moles", "uniform color", "regular borders"],
-        "causes": ["genetic factors", "sun exposure", "hormonal changes"],
-        "treatments": ["monitoring", "surgical removal if needed", "sun protection"],
-        "severity": "low"
-    },
-    "melanoma": {
-        "symptoms": ["asymmetric moles", "irregular borders", "color variation"],
-        "causes": ["UV radiation", "genetic factors", "fair skin"],
-        "treatments": ["surgical excision", "immunotherapy", "targeted therapy"],
-        "severity": "high"
-    },
-    "squamous_cell_carcinoma": {
-        "symptoms": ["red scaly patches", "crusty sores", "firm nodules"],
-        "causes": ["sun damage", "UV radiation", "fair skin"],
-        "treatments": ["surgical removal", "radiation therapy", "Mohs surgery"],
-        "severity": "high"
-    },
-    "tinea_ringworm_candidiasis": {
-        "symptoms": ["red circular patches", "itching", "scaling"],
-        "causes": ["fungal infection", "moisture", "poor hygiene"],
-        "treatments": ["antifungal medications", "keeping area dry", "good hygiene"],
-        "severity": "moderate"
-    },
-    "vascular_lesion": {
-        "symptoms": ["red or purple spots", "raised lesions", "blood vessel clusters"],
-        "causes": ["genetic factors", "hormonal changes", "sun exposure"],
-        "treatments": ["laser therapy", "sclerotherapy", "surgical removal"],
-        "severity": "low"
+    "Platelets": {
+        "characteristics": ["small fragments", "no nucleus", "irregular shape"],
+        "normal_count": "150,000-450,000 per microliter",
+        "function": ["blood clotting", "wound healing"],
+        "abnormalities": {
+            "low": ["bleeding disorders", "bone marrow failure"],
+            "high": ["thrombocytosis", "inflammation"]
+        },
+        "severity_indicators": {
+            "count": ["normal", "low", "high"],
+            "size": ["normal", "large", "small"],
+            "distribution": ["normal", "clumped", "scattered"]
+        }
     }
 }
 
-class SkinImageAnalysisTool(BaseTool):
-    name: str = "skin_image_analyzer"
-    description: str = "Analyze skin images for disease detection and health assessment"
+class BloodCellAnalysisTool(BaseTool):
+    name: str = "blood_cell_analyzer"
+    description: str = "Analyze blood cell images for detection and morphology assessment"
     
-    def _run(self, image_description: str, detected_disease: str, confidence: float) -> str:
-        """Analyze skin image and provide detailed insights"""
+    def _run(self, image_description: str, detected_cell: str, confidence: float) -> str:
+        """Analyze blood cell image and provide detailed insights"""
         analysis = {
-            "disease": detected_disease,
+            "cell_type": detected_cell,
             "confidence": confidence,
-            "severity": self._assess_severity(confidence, detected_disease),
-            "symptoms": self._get_symptoms(detected_disease),
-            "recommendations": self._get_recommendations(detected_disease),
-            "risk_level": self._assess_risk(detected_disease, confidence)
+            "characteristics": self._get_characteristics(detected_cell),
+            "abnormalities": self._check_abnormalities(detected_cell, image_description),
+            "recommendations": self._get_recommendations(detected_cell),
+            "count_assessment": self._assess_count(detected_cell, confidence)
         }
         return json.dumps(analysis, indent=2)
     
-    def _assess_severity(self, confidence: float, disease: str) -> str:
-        if disease.lower() in SKIN_DISEASE_KNOWLEDGE:
-            return SKIN_DISEASE_KNOWLEDGE[disease.lower()].get("severity", "unknown")
-        elif confidence > 0.9:
-            return "High"
-        elif confidence > 0.7:
-            return "Moderate"
-        else:
-            return "Low"
-    
-    def _get_symptoms(self, disease: str) -> List[str]:
-        disease_lower = disease.lower()
-        if disease_lower in SKIN_DISEASE_KNOWLEDGE:
-            return SKIN_DISEASE_KNOWLEDGE[disease_lower].get("symptoms", [])
-        return ["Consult dermatologist for specific symptoms"]
-    
-    def _get_recommendations(self, disease: str) -> List[str]:
-        disease_lower = disease.lower()
-        if disease_lower in SKIN_DISEASE_KNOWLEDGE:
-            return SKIN_DISEASE_KNOWLEDGE[disease_lower].get("treatments", [])
-        return ["Seek professional dermatological consultation"]
-
-class SymptomCheckerTool(BaseTool):
-    name: str = "symptom_checker"
-    description: str = "Cross-reference symptoms with detected skin diseases"
-    
-    def _run(self, symptoms: str, detected_disease: str) -> str:
-        """Check symptoms against detected disease"""
-        disease_lower = detected_disease.lower()
-        
-        if disease_lower in SKIN_DISEASE_KNOWLEDGE:
-            expected_symptoms = SKIN_DISEASE_KNOWLEDGE[disease_lower].get("symptoms", [])
-            symptom_match = self._compare_symptoms(symptoms, expected_symptoms)
-            return f"Symptom match: {symptom_match}% - Expected: {expected_symptoms}"
-        
-        return "Disease not found in knowledge base"
-    
-    def _compare_symptoms(self, observed: str, expected: List[str]) -> int:
-        """Compare observed symptoms with expected symptoms"""
-        observed_lower = observed.lower()
-        matches = sum(1 for symptom in expected if symptom.lower() in observed_lower)
-        return int((matches / len(expected)) * 100) if expected else 0
-
-class TreatmentAdvisorTool(BaseTool):
-    name: str = "treatment_advisor"
-    description: str = "Provide evidence-based treatment recommendations for skin diseases"
-    
-    def _run(self, disease: str, severity: str) -> str:
-        """Provide treatment recommendations"""
-        disease_lower = disease.lower()
-        
-        if disease_lower in SKIN_DISEASE_KNOWLEDGE:
-            treatments = SKIN_DISEASE_KNOWLEDGE[disease_lower].get("treatments", [])
-            causes = SKIN_DISEASE_KNOWLEDGE[disease_lower].get("causes", [])
-            
+    def _get_characteristics(self, cell_type: str) -> Dict:
+        cell_lower = cell_type.lower()
+        if cell_lower in BLOOD_CELL_KNOWLEDGE:
             return {
-                "treatments": treatments,
-                "causes": causes,
-                "severity": severity,
-                "urgency": "High" if severity == "high" else "Moderate"
+                "features": BLOOD_CELL_KNOWLEDGE[cell_lower]["characteristics"],
+                "normal_count": BLOOD_CELL_KNOWLEDGE[cell_lower]["normal_count"],
+                "function": BLOOD_CELL_KNOWLEDGE[cell_lower].get("function", [])
             }
+        return {"error": "Cell type not found in knowledge base"}
+    
+    def _check_abnormalities(self, cell_type: str, description: str) -> Dict:
+        cell_lower = cell_type.lower()
+        if cell_lower in BLOOD_CELL_KNOWLEDGE:
+            abnormalities = BLOOD_CELL_KNOWLEDGE[cell_lower].get("abnormalities", {})
+            severity = self._assess_severity(cell_type, description)
+            return {
+                "possible_conditions": abnormalities,
+                "severity": severity
+            }
+        return {"error": "Unable to assess abnormalities"}
+    
+    def _get_recommendations(self, cell_type: str) -> List[str]:
+        cell_lower = cell_type.lower()
+        recommendations = []
         
-        return {"message": "Consult dermatologist for treatment plan"}
+        if cell_lower in BLOOD_CELL_KNOWLEDGE:
+            cell_info = BLOOD_CELL_KNOWLEDGE[cell_lower]
+            recommendations.extend([
+                f"Monitor {cell_type} count and morphology",
+                f"Normal range: {cell_info['normal_count']}",
+                "Consider complete blood count (CBC) test"
+            ])
+        
+        recommendations.append("Consult hematologist for detailed analysis")
+        return recommendations
+    
+    def _assess_severity(self, cell_type: str, description: str) -> str:
+        cell_lower = cell_type.lower()
+        if cell_lower in BLOOD_CELL_KNOWLEDGE:
+            indicators = BLOOD_CELL_KNOWLEDGE[cell_lower].get("severity_indicators", {})
+            description_lower = description.lower()
+            
+            # Check for known abnormal indicators in the description
+            abnormal_indicators = sum(
+                any(indicator in description_lower for indicator in values[1:])  # Skip 'normal'
+                for values in indicators.values()
+            )
+            
+            if abnormal_indicators > 2:
+                return "High"
+            elif abnormal_indicators > 0:
+                return "Moderate"
+        
+        return "Normal"
+    
+    def _assess_count(self, cell_type: str, confidence: float) -> Dict:
+        cell_lower = cell_type.lower()
+        if cell_lower in BLOOD_CELL_KNOWLEDGE:
+            return {
+                "normal_range": BLOOD_CELL_KNOWLEDGE[cell_lower]["normal_count"],
+                "detection_confidence": confidence,
+                "recommendation": "Verify with manual count if needed"
+            }
+        return {"error": "Unable to assess cell count"}
+
+class CellMorphologyTool(BaseTool):
+    name: str = "morphology_analyzer"
+    description: str = "Analyze blood cell morphology and characteristics"
+    
+    def _run(self, cell_type: str, morphology_description: str) -> str:
+        """Analyze blood cell morphology"""
+        cell_lower = cell_type.lower()
+        
+        if cell_lower in BLOOD_CELL_KNOWLEDGE:
+            cell_info = BLOOD_CELL_KNOWLEDGE[cell_lower]
+            analysis = self._analyze_morphology(cell_type, morphology_description, cell_info)
+            return json.dumps(analysis, indent=2)
+        
+        return "Cell type not found in knowledge base"
+    
+    def _analyze_morphology(self, cell_type: str, description: str, cell_info: Dict) -> Dict:
+        """Analyze cell morphology based on description"""
+        description_lower = description.lower()
+        
+        # Get relevant indicators for the cell type
+        indicators = cell_info.get("severity_indicators", {})
+        
+        analysis = {
+            "cell_type": cell_type,
+            "normal_characteristics": cell_info["characteristics"],
+            "observed_features": [],
+            "abnormalities": [],
+            "significance": "normal"
+        }
+        
+        # Check for abnormal features
+        for feature_type, possible_values in indicators.items():
+            for value in possible_values:
+                if value.lower() in description_lower:
+                    analysis["observed_features"].append(f"{feature_type}: {value}")
+                    if value.lower() != "normal":
+                        analysis["abnormalities"].append(f"Abnormal {feature_type}: {value}")
+        
+        # Assess significance
+        if len(analysis["abnormalities"]) > 2:
+            analysis["significance"] = "high"
+        elif len(analysis["abnormalities"]) > 0:
+            analysis["significance"] = "moderate"
+        
+        return analysis
+
+class BloodCountAnalyzerTool(BaseTool):
+    name: str = "blood_count_analyzer"
+    description: str = "Analyze blood cell counts and distributions"
+    
+    def _run(self, cell_type: str, count_data: Dict) -> str:
+        """Analyze blood cell counts"""
+        cell_lower = cell_type.lower()
+        
+        if cell_lower in BLOOD_CELL_KNOWLEDGE:
+            cell_info = BLOOD_CELL_KNOWLEDGE[cell_lower]
+            analysis = self._analyze_count(cell_type, count_data, cell_info)
+            return json.dumps(analysis, indent=2)
+        
+        return {"error": "Unknown cell type"}
+    
+    def _analyze_count(self, cell_type: str, count_data: Dict, cell_info: Dict) -> Dict:
+        """Analyze cell count data"""
+        normal_range = cell_info["normal_count"]
+        analysis = {
+            "cell_type": cell_type,
+            "normal_range": normal_range,
+            "current_count": count_data.get("count", "unknown"),
+            "status": "normal",
+            "possible_conditions": []
+        }
+        
+        # Check if count is provided and analyze
+        if "count" in count_data:
+            count = self._parse_count(count_data["count"])
+            normal_low, normal_high = self._parse_range(normal_range)
+            
+            if count < normal_low:
+                analysis["status"] = "low"
+                analysis["possible_conditions"] = cell_info["abnormalities"]["low"]
+            elif count > normal_high:
+                analysis["status"] = "high"
+                analysis["possible_conditions"] = cell_info["abnormalities"]["high"]
+        
+        return analysis
+    
+    def _parse_count(self, count_str: str) -> float:
+        """Parse count value from string"""
+        try:
+            return float(count_str.replace(",", ""))
+        except:
+            return 0.0
+    
+    def _parse_range(self, range_str: str) -> tuple[float, float]:
+        """Parse normal range values"""
+        try:
+            low, high = range_str.split("-")
+            return (float(low.replace(",", "")), float(high.replace(",", "")))
+        except:
+            return (0.0, 0.0)
 
 class RiskAssessorTool(BaseTool):
     name: str = "risk_assessor"
@@ -229,8 +330,8 @@ class RiskAssessorTool(BaseTool):
             "recommendations": ["Immediate dermatological consultation", "Sun protection", "Regular monitoring"]
         }
 
-class SkinAIAgent:
-    """Main Skin AI Agent for SkinDiseaseAI"""
+class BloodCellAIAgent:
+    """Main AI Agent for Blood Cell Detection and Analysis"""
     
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -239,9 +340,9 @@ class SkinAIAgent:
         
         # Initialize tools
         self.tools = [
-            SkinImageAnalysisTool(),
-            SymptomCheckerTool(),
-            TreatmentAdvisorTool(),
+            BloodCellAnalysisTool(),
+            CellMorphologyTool(),
+            BloodCountAnalyzerTool(),
             RiskAssessorTool()
         ]
         
@@ -293,30 +394,30 @@ class SkinAIAgent:
         # If all models fail, raise an exception
         raise Exception("All GROQ models are currently unavailable")
     
-    def analyze_skin_case(self, 
+    def analyze_blood_sample(self, 
                           image_description: str,
-                          detected_disease: str,
-                          confidence: float,
-                          skin_data: Dict,
-                          symptoms: str = "") -> Dict:
-        """Comprehensive skin case analysis"""
+                          detected_cells: List[str],
+                          confidences: List[float],
+                          count_data: Dict,
+                          morphology: str = "") -> Dict:
+        """Comprehensive blood sample analysis"""
         
         # Create analysis prompt
         prompt = f"""
-        Analyze this skin disease case comprehensively:
+        Analyze this blood sample comprehensively:
         
         Image Description: {image_description}
-        Detected Disease: {detected_disease}
-        Confidence: {confidence}
-        Skin Data: {skin_data}
-        Symptoms: {symptoms}
+        Detected Cells: {', '.join(detected_cells)}
+        Confidence Scores: {', '.join([f'{c:.2f}' for c in confidences])}
+        Count Data: {json.dumps(count_data, indent=2)}
+        Morphology Notes: {morphology}
         
         Provide a detailed analysis including:
-        1. Disease assessment
-        2. Symptom correlation
-        3. Treatment recommendations
-        4. Risk assessment
-        5. Prevention strategies
+        1. Cell type identification
+        2. Morphology assessment
+        3. Count analysis
+        4. Abnormality detection
+        5. Clinical implications
         """
         
         try:
@@ -330,25 +431,25 @@ class SkinAIAgent:
             return {
                 "error": str(e),
                 "fallback_analysis": self._generate_fallback_analysis(
-                    detected_disease, confidence, skin_data
+                    detected_cells, confidences, count_data
                 )
             }
     
-    def _generate_fallback_analysis(self, disease: str, confidence: float, skin_data: Dict) -> str:
+    def _generate_fallback_analysis(self, cells: List[str], confidences: List[float], count_data: Dict) -> str:
         """Generate fallback analysis when agent fails"""
         return f"""
-        **Fallback Analysis**
+        **Fallback Blood Sample Analysis**
         
-        Disease: {disease}
-        Confidence: 99.0%
+        Detected Cells: {', '.join(cells)}
+        Average Confidence: {sum(confidences)/len(confidences):.2f}
         
         **Recommendations:**
-        1. Consult a dermatologist for proper diagnosis
-        2. Monitor the lesion for changes
-        3. Protect skin from sun exposure
-        4. Maintain good skincare practices
+        1. Verify cell counts with manual analysis
+        2. Check for morphological abnormalities
+        3. Consider additional blood tests if needed
+        4. Consult with hematologist for detailed interpretation
         
-        **Note:** This is a preliminary analysis. Professional dermatological consultation is required.
+        **Note:** This is an automated preliminary analysis. Professional laboratory verification is required.
         """
 
 class ResearchAssistantAgent:
@@ -456,8 +557,8 @@ class DataAnalysisAgent:
 # Utility functions
 def create_agent_instance(agent_type: str, api_key: str):
     """Create agent instance based on type"""
-    if agent_type == "skin":
-        return SkinAIAgent(api_key)
+    if agent_type == "blood":
+        return BloodCellAIAgent(api_key)
     elif agent_type == "research":
         return ResearchAssistantAgent(api_key)
     elif agent_type == "data":
@@ -465,8 +566,8 @@ def create_agent_instance(agent_type: str, api_key: str):
     else:
         raise ValueError(f"Unknown agent type: {agent_type}")
 
-def get_agent_recommendations(disease: str, skin_data: Dict) -> Dict:
-    """Get agent recommendations for a disease"""
+def get_agent_recommendations(cell_type: str, count_data: Dict) -> Dict:
+    """Get agent recommendations for blood cell analysis"""
     recommendations = {
         "immediate_actions": [],
         "short_term": [],
@@ -474,28 +575,53 @@ def get_agent_recommendations(disease: str, skin_data: Dict) -> Dict:
         "monitoring": []
     }
     
-    # Disease-specific recommendations
-    disease_lower = disease.lower()
+    # Cell-specific recommendations
+    cell_lower = cell_type.lower()
     
-    if any(keyword in disease_lower for keyword in ["melanoma", "carcinoma", "actinic"]):
-        recommendations["immediate_actions"].append("Seek immediate dermatological consultation")
-        recommendations["short_term"].append("Document lesion changes")
-        recommendations["long_term"].append("Regular skin cancer screening")
+    if cell_lower in BLOOD_CELL_KNOWLEDGE:
+        cell_info = BLOOD_CELL_KNOWLEDGE[cell_lower]
+        
+        # Check for count abnormalities
+        if "count" in count_data:
+            try:
+                count = float(str(count_data["count"]).replace(",", ""))
+                normal_range = cell_info["normal_count"]
+                low, high = map(float, normal_range.split("-")[0].replace(",", "").split())
+                
+                if count < low:
+                    recommendations["immediate_actions"].extend([
+                        f"Verify low {cell_type} count",
+                        "Consider complete blood count (CBC) test"
+                    ])
+                    recommendations["short_term"].extend([
+                        "Monitor for signs of underlying conditions",
+                        f"Check for {', '.join(cell_info['abnormalities']['low'])}"
+                    ])
+                elif count > high:
+                    recommendations["immediate_actions"].extend([
+                        f"Verify high {cell_type} count",
+                        "Schedule follow-up blood tests"
+                    ])
+                    recommendations["short_term"].extend([
+                        "Monitor for associated symptoms",
+                        f"Check for {', '.join(cell_info['abnormalities']['high'])}"
+                    ])
+            except:
+                recommendations["immediate_actions"].append("Verify cell count measurement")
     
-    if "dermatitis" in disease_lower:
-        recommendations["immediate_actions"].append("Apply prescribed topical treatments")
-        recommendations["short_term"].append("Identify and avoid triggers")
-        recommendations["long_term"].append("Establish proper skincare routine")
-    
-    if "fungal" in disease_lower or "tinea" in disease_lower:
-        recommendations["immediate_actions"].append("Apply antifungal medication")
-        recommendations["short_term"].append("Keep affected area dry")
-        recommendations["long_term"].append("Maintain good hygiene practices")
-    
+    # General monitoring recommendations
     recommendations["monitoring"].extend([
-        "Monitor skin changes daily",
-        "Track disease progression",
-        "Regular dermatological checkups"
+        "Regular complete blood count (CBC)",
+        "Track cell count trends",
+        "Monitor cell morphology",
+        "Document any symptoms"
+    ])
+    
+    # Long-term recommendations
+    recommendations["long_term"].extend([
+        "Establish baseline blood values",
+        "Regular health check-ups",
+        "Maintain medical records"
     ])
     
     return recommendations

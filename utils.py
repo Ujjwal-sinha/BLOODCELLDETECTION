@@ -84,6 +84,64 @@ except ImportError:
 # Report generation
 from fpdf import FPDF
 
+# Constants for blood cell detection
+BLOOD_CELL_CLASSES = ['Platelets', 'RBC', 'WBC']
+REQUIRED_DATASET_STRUCTURE = ['train', 'valid', 'test']
+REQUIRED_SUBFOLDERS = ['images', 'labels']
+
+def validate_dataset(dataset_path: str) -> tuple[bool, str]:
+    """
+    Validates the blood cell detection dataset structure.
+    
+    Args:
+        dataset_path (str): Path to the dataset root directory
+        
+    Returns:
+        tuple[bool, str]: (is_valid, message)
+    """
+    if not os.path.exists(dataset_path):
+        return False, f"Dataset directory '{dataset_path}' does not exist"
+        
+    # Check for required splits
+    for split in REQUIRED_DATASET_STRUCTURE:
+        split_path = os.path.join(dataset_path, split)
+        if not os.path.exists(split_path):
+            return False, f"Missing {split} directory"
+            
+        # Check for images and labels folders
+        for subfolder in REQUIRED_SUBFOLDERS:
+            subfolder_path = os.path.join(split_path, subfolder)
+            if not os.path.exists(subfolder_path):
+                return False, f"Missing {subfolder} folder in {split} directory"
+                
+            # Check if folders are not empty
+            if len(os.listdir(subfolder_path)) == 0:
+                return False, f"No files found in {split}/{subfolder}"
+                
+    # Validate data.yaml
+    yaml_path = os.path.join(dataset_path, 'data.yaml')
+    if not os.path.exists(yaml_path):
+        return False, "Missing data.yaml configuration file"
+        
+    try:
+        import yaml
+        with open(yaml_path, 'r') as f:
+            config = yaml.safe_load(f)
+            if 'names' not in config:
+                return False, "Missing 'names' field in data.yaml"
+            if not isinstance(config['names'], (list, dict)):
+                return False, "Invalid format for 'names' in data.yaml"
+            if isinstance(config['names'], dict):
+                classes = list(config['names'].values())
+            else:
+                classes = config['names']
+            if not all(c in BLOOD_CELL_CLASSES for c in classes):
+                return False, f"Invalid cell types. Expected: {BLOOD_CELL_CLASSES}"
+    except Exception as e:
+        return False, f"Error reading data.yaml: {str(e)}"
+        
+    return True, "Dataset validation successful"
+
 # Third-party imports
 import streamlit as st
 import numpy as np
