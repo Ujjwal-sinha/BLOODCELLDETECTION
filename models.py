@@ -30,13 +30,25 @@ def clear_mps_cache():
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
 
-def preprocess_image(img_path, output_path):
-    """Preprocess skin images for better disease detection"""
+def load_yolo_model(weights_path='yolo11n.pt'):
+    """Load YOLO model for blood cell detection"""
+    try:
+        from ultralytics import YOLO
+        model = YOLO(weights_path)
+        return model
+    except Exception as e:
+        print(f"Error loading YOLO model: {e}")
+        return None
+
+def preprocess_image(img_path, output_path=None):
+    """Preprocess blood cell images for better detection"""
     try:
         img = Image.open(img_path).convert('RGB')
         
-        # Apply CLAHE for better contrast
+        # Convert to numpy array
         img_array = np.array(img)
+        
+        # Apply CLAHE for better contrast
         lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
         lab[:,:,0] = clahe.apply(lab[:,:,0])
@@ -44,10 +56,13 @@ def preprocess_image(img_path, output_path):
         
         # Convert back to PIL
         enhanced_img = Image.fromarray(enhanced)
-        enhanced_img.save(output_path, quality=95)
-        return True
+        
+        if output_path:
+            enhanced_img.save(output_path, quality=95)
+        return enhanced_img
     except Exception as e:
         print(f"Error preprocessing image: {e}")
+        return None
         return False
 
 def augment_with_blur(img_path, output_path, blur_radius=2):
@@ -299,6 +314,52 @@ def detect_blood_cells(model, image_path):
     Returns:
         Dictionary containing detection results
     """
+    try:
+        # Run inference
+        results = model(image_path)
+        
+        # Process results
+        detections = {
+            'RBC': [],
+            'WBC': [],
+            'Platelets': []
+        }
+        
+        # Extract detection results
+        for r in results:
+            boxes = r.boxes
+            for box in boxes:
+                x1, y1, x2, y2 = box.xyxy[0].tolist()  # get box coordinates
+                conf = box.conf[0].item()  # confidence score
+                cls = int(box.cls[0].item())  # class id
+                cls_name = model.names[cls]  # class name
+                
+                detections[cls_name].append({
+                    'bbox': [x1, y1, x2, y2],
+                    'confidence': conf
+                })
+        
+        # Calculate statistics
+        stats = {
+            'RBC_count': len(detections['RBC']),
+            'WBC_count': len(detections['WBC']),
+            'Platelet_count': len(detections['Platelets']),
+            'confidence_scores': {
+                'RBC': sum(d['confidence'] for d in detections['RBC']) / len(detections['RBC']) if detections['RBC'] else 0,
+                'WBC': sum(d['confidence'] for d in detections['WBC']) / len(detections['WBC']) if detections['WBC'] else 0,
+                'Platelets': sum(d['confidence'] for d in detections['Platelets']) / len(detections['Platelets']) if detections['Platelets'] else 0
+            }
+        }
+        
+        return {
+            'detections': detections,
+            'stats': stats,
+            'raw_results': results
+        }
+        
+    except Exception as e:
+        print(f"Error detecting blood cells: {e}")
+        return None
     model.eval()
     
     # Transform image
@@ -528,8 +589,57 @@ def combined_prediction(image, cnn_model, classes, ai_analysis=None):
             'confidence_spread': 0.0
         }
 
-def plot_metrics(train_losses, val_losses, train_accuracies, val_accuracies, classes, y_true, y_score, all_labels=None, all_predictions=None):
-    """Plot training metrics for skin disease detection"""
+def plot_metrics(results, save_dir='./plots'):
+    """
+    Plot metrics for blood cell detection
+    Args:
+        results: Detection results from YOLO model
+        save_dir: Directory to save plots
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Extract detection statistics
+    stats = results['stats']
+    
+    # Create bar plot of cell counts
+    plt.figure(figsize=(10, 6))
+    cell_types = ['RBC', 'WBC', 'Platelets']
+    counts = [stats['RBC_count'], stats['WBC_count'], stats['Platelet_count']]
+    colors = ['#ef5350', '#42a5f5', '#66bb6a']
+    
+    plt.bar(cell_types, counts, color=colors)
+    plt.title('Blood Cell Count Distribution')
+    plt.ylabel('Count')
+    plt.grid(True, alpha=0.3)
+    
+    # Add count labels on top of bars
+    for i, count in enumerate(counts):
+        plt.text(i, count, str(count), ha='center', va='bottom')
+    
+    plt.savefig(os.path.join(save_dir, 'cell_counts.png'))
+    plt.close()
+    
+    # Create confidence score plot
+    plt.figure(figsize=(10, 6))
+    conf_scores = [stats['confidence_scores'][cell_type] for cell_type in cell_types]
+    
+    plt.bar(cell_types, conf_scores, color=colors)
+    plt.title('Detection Confidence Scores')
+    plt.ylabel('Average Confidence')
+    plt.ylim(0, 1)
+    plt.grid(True, alpha=0.3)
+    
+    # Add confidence score labels
+    for i, score in enumerate(conf_scores):
+        plt.text(i, score, f'{score:.2f}', ha='center', va='bottom')
+    
+    plt.savefig(os.path.join(save_dir, 'confidence_scores.png'))
+    plt.close()
+    
+    return {
+        'cell_counts_plot': os.path.join(save_dir, 'cell_counts.png'),
+        'confidence_plot': os.path.join(save_dir, 'confidence_scores.png')
+    }
     plot_paths = []
     
     try:

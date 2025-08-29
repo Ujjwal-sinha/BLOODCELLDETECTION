@@ -24,9 +24,8 @@ import numpy as np
 
 # Import from modular files
 from models import (
-    device, clear_mps_cache, load_cnn_model, train_model,
-    evaluate_model, apply_lime, plot_metrics, create_evaluation_dashboard, SkinDataset,
-    combined_prediction
+    device, clear_mps_cache, load_yolo_model, preprocess_image,
+    plot_metrics, create_evaluation_dashboard
 )
 from utils import (
     load_css, load_models, check_image_quality, describe_image, query_langchain,
