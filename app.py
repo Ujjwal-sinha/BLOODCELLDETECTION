@@ -14,40 +14,44 @@ from datetime import datetime
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from sklearn.model_selection import train_test_split
 import tempfile
 import uuid
 import glob
-
+import yaml
 import cv2
 import numpy as np
 
 # Import from modular files
 from models import (
     device, clear_mps_cache, load_yolo_model, preprocess_image,
-    plot_metrics, create_evaluation_dashboard
+    plot_metrics, plot_detection_results
 )
 from utils import (
-    load_css, load_models, check_image_quality, describe_image, query_langchain,
-    SkinPDF, gradient_text, validate_dataset, get_image_transform, test_groq_api, generate_fallback_response,
-    search_diseases_globally, create_advanced_visualizations, create_lime_visualization, create_gradcam_visualization, create_shap_visualization
+    load_css, validate_dataset, get_image_transform, check_image_quality,
+    gradient_text, plot_cell_distribution, generate_report
 )
 
-# Import AI agents
+# Import AI agents if available
 try:
-    from agents import SkinAIAgent, ResearchAssistantAgent, DataAnalysisAgent, create_agent_instance, get_agent_recommendations
+    from agents import BloodCellDetectionAgent
     AGENTS_AVAILABLE = True
 except ImportError:
     AGENTS_AVAILABLE = False
-    st.warning("AI Agents module not available. Some advanced features may be limited.")
 
-# Load external CSS file
+# Load custom CSS for UI
 load_css()
 
-# Load environment variables and check API key
-from dotenv import load_dotenv
-load_dotenv()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Initialize YOLO model
+@st.cache_resource
+def load_detection_model():
+    try:
+        model = load_yolo_model('yolo11n.pt')
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        return None
+
+model = load_detection_model()
 if not GROQ_API_KEY:
     GROQ_API_KEY = st.sidebar.text_input("Enter GROQ API Key", type="password")
     if not GROQ_API_KEY:

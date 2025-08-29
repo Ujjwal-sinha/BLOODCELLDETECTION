@@ -4,22 +4,49 @@ Advanced CNN and YOLO models for blood cell detection and classification
 """
 
 import os
+import sys
+import tempfile
+from typing import Dict, List, Optional, Tuple, Union
+import warnings
+
+# Deep Learning imports
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, models
-import streamlit as st
+
+# Data processing and visualization
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc, precision_recall_curve
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    accuracy_score, classification_report, confusion_matrix,
+    roc_curve, auc, precision_recall_curve
+)
 from PIL import Image, ImageFilter
-import cv2
-import lime
-from lime import lime_image
-import warnings
+
+# Try importing optional dependencies
+try:
+    import cv2
+except ImportError:
+    print("Warning: OpenCV not found. Install with: pip install opencv-python-headless")
+    
+try:
+    from lime import lime_image
+    LIME_AVAILABLE = True
+except ImportError:
+    print("Warning: LIME not found. Install with: pip install lime")
+    LIME_AVAILABLE = False
+    
+try:
+    from ultralytics import YOLO
+    YOLO_AVAILABLE = True
+except ImportError:
+    print("Warning: Ultralytics not found. Install with: pip install ultralytics")
+    YOLO_AVAILABLE = False
+
+# Suppress warnings
 warnings.filterwarnings('ignore')
 
 # Device configuration
@@ -31,21 +58,48 @@ def clear_mps_cache():
         torch.mps.empty_cache()
 
 def load_yolo_model(weights_path='yolo11n.pt'):
-    """Load YOLO model for blood cell detection"""
+    """
+    Load YOLO model for blood cell detection
+    
+    Args:
+        weights_path (str): Path to the YOLO model weights
+        
+    Returns:
+        YOLO: Loaded YOLO model configured for blood cell detection
+    """
     try:
         from ultralytics import YOLO
         model = YOLO(weights_path)
+        
+        # Configure model settings
+        model.conf = 0.25  # Default confidence threshold
+        model.iou = 0.45   # Default NMS IoU threshold
+        model.classes = [0, 1, 2]  # RBC, WBC, Platelets
+        
         return model
     except Exception as e:
         print(f"Error loading YOLO model: {e}")
         return None
 
-def preprocess_image(img_path, output_path=None):
-    """Preprocess blood cell images for better detection"""
-    try:
-        img = Image.open(img_path).convert('RGB')
+def preprocess_image(img, output_path=None):
+    """
+    Preprocess blood cell images for better detection
+    
+    Args:
+        img: PIL Image or path to image
+        output_path (str, optional): Path to save preprocessed image
         
-        # Convert to numpy array
+    Returns:
+        PIL.Image: Preprocessed image optimized for blood cell detection
+    """
+    try:
+        # Handle both file path and PIL Image inputs
+        if isinstance(img, str):
+            img = Image.open(img).convert('RGB')
+        elif isinstance(img, np.ndarray):
+            img = Image.fromarray(img).convert('RGB')
+            
+        # Convert to numpy array for processing
         img_array = np.array(img)
         
         # Apply CLAHE for better contrast
@@ -76,42 +130,83 @@ def augment_with_blur(img_path, output_path, blur_radius=2):
         print(f"Error creating blur augmentation: {e}")
         return False
 
-class SkinDataset(Dataset):
+class BloodCellDataset(Dataset):
     """
-    Custom Dataset for skin disease images
+    Custom Dataset for blood cell detection
+    Expects YOLO format dataset with train/valid/test splits and labels
     """
-    def __init__(self, data_dir, transform=None):
-        self.data_dir = data_dir
+    def __init__(self, data_dir: str, split: str = 'train', transform=None):
+        """
+        Initialize BloodCellDataset
+        
+        Args:
+            data_dir (str): Root directory of the dataset
+            split (str): Dataset split ('train', 'valid', or 'test')
+            transform: Optional transform to be applied on images
+        """
+        self.data_dir = os.path.join(data_dir, split)
         self.transform = transform
-        self.classes = sorted([d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))])
+        self.classes = ['RBC', 'WBC', 'Platelets']
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
         
-        self.images = []
-        self.labels = []
+        # Verify directory structure
+        self.images_dir = os.path.join(self.data_dir, 'images')
+        self.labels_dir = os.path.join(self.data_dir, 'labels')
         
-        for class_name in self.classes:
-            class_dir = os.path.join(data_dir, class_name)
-            class_idx = self.class_to_idx[class_name]
-            
-            for img_name in os.listdir(class_dir):
-                if img_name.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    img_path = os.path.join(class_dir, img_name)
-                    self.images.append(img_path)
-                    self.labels.append(class_idx)
-    
-    def __len__(self):
-        return len(self.images)
-    
-    def __getitem__(self, idx):
-        img_path = self.images[idx]
-        label = self.labels[idx]
+        if not os.path.exists(self.images_dir) or not os.path.exists(self.labels_dir):
+            raise ValueError(f"Invalid dataset structure. Expected 'images' and 'labels' directories in {self.data_dir}")
         
+        # Load image paths and corresponding labels
+        self.image_files = sorted([f for f in os.listdir(self.images_dir) 
+                                if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+        
+    def __len__(self) -> int:
+        return len(self.image_files)
+    
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        img_name = self.image_files[idx]
+        img_path = os.path.join(self.images_dir, img_name)
+        
+        # Load and process image
         image = Image.open(img_path).convert('RGB')
-        
         if self.transform:
             image = self.transform(image)
+            
+        # Load corresponding label file if it exists
+        label_path = os.path.join(self.labels_dir, 
+                                os.path.splitext(img_name)[0] + '.txt')
         
-        return image, label
+        targets = {
+            'boxes': torch.zeros((0, 4)),
+            'labels': torch.zeros(0, dtype=torch.int64),
+            'image_id': torch.tensor([idx])
+        }
+        
+        if os.path.exists(label_path):
+            # YOLO format: class x_center y_center width height
+            boxes = []
+            labels = []
+            
+            with open(label_path, 'r') as f:
+                for line in f:
+                    data = list(map(float, line.strip().split()))
+                    class_idx = int(data[0])
+                    x_center, y_center, width, height = data[1:]
+                    
+                    # Convert YOLO format to [x1, y1, x2, y2]
+                    x1 = x_center - width/2
+                    y1 = y_center - height/2
+                    x2 = x_center + width/2
+                    y2 = y_center + height/2
+                    
+                    boxes.append([x1, y1, x2, y2])
+                    labels.append(class_idx)
+            
+            if boxes:
+                targets['boxes'] = torch.tensor(boxes, dtype=torch.float32)
+                targets['labels'] = torch.tensor(labels, dtype=torch.int64)
+        
+        return image, targets
 
 def load_yolo_model(model_path='yolo11n.pt'):
     """
@@ -384,59 +479,66 @@ def detect_blood_cells(model, image_path):
         'all_classes': classes
     }
 
-def force_retrain_model(data_dir, num_epochs=15, learning_rate=0.001, batch_size=32):
+def train_blood_cell_detector(data_dir: str, weights_path: str = 'yolo11n.pt',
+                        epochs: int = 100, batch_size: int = 16) -> None:
     """
-    Force retrain the skin disease model from scratch
+    Train YOLO model for blood cell detection
+    
+    Args:
+        data_dir (str): Path to dataset directory with YOLO format
+        weights_path (str): Path to save/load model weights
+        epochs (int): Number of training epochs
+        batch_size (int): Batch size for training
     """
-    # Set device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+    if not YOLO_AVAILABLE:
+        raise ImportError("Ultralytics YOLO is required. Install with: pip install ultralytics")
+    
     print(f"Using device: {device}")
     
-    # Data transforms
-    train_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(10),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    
-    val_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    
-    # Create datasets
-    train_dataset = SkinDataset(os.path.join(data_dir, 'train'), transform=train_transform)
-    val_dataset = SkinDataset(os.path.join(data_dir, 'val'), transform=val_transform)
-    
-    # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-    
-    # Get number of classes
-    num_classes = len(train_dataset.classes)
-    print(f"Number of skin disease classes: {num_classes}")
-    print(f"Classes: {train_dataset.classes}")
-    
-    # Create model
-    model = load_cnn_model(num_classes)
-    
-    # Train model
-    print("Starting skin disease model training...")
-    history = train_model(model, train_loader, val_loader, num_epochs, learning_rate, device)
-    
-    # Plot training history
-    plot_training_history(history)
-    
-    # Save final model
-    torch.save(model.state_dict(), 'skin_disease_model_final.pth')
-    
-    print(f"Training completed! Best validation accuracy: {history['best_val_acc']:.2f}%")
-    
-    return model, history, train_dataset.classes
+    # Verify dataset structure
+    yaml_path = os.path.join(data_dir, 'data.yaml')
+    if not os.path.exists(yaml_path):
+        raise FileNotFoundError(f"data.yaml not found in {data_dir}")
+        
+    # Load or create YOLO model
+    try:
+        if os.path.exists(weights_path):
+            print(f"Loading existing model from {weights_path}")
+            model = YOLO(weights_path)
+        else:
+            print("Creating new YOLO model")
+            model = YOLO('yolov8n.yaml')
+        
+        # Configure model
+        model.classes = ['RBC', 'WBC', 'Platelets']
+        
+        # Train model
+        print("Starting blood cell detection training...")
+        results = model.train(
+            data=yaml_path,
+            epochs=epochs,
+            batch=batch_size,
+            imgsz=640,
+            save=True,
+            device=device,
+            project='blood_cell_detection',
+            name='train',
+            exist_ok=True,
+            pretrained=True,
+            optimizer='Adam'
+        )
+        
+        print("Training completed!")
+        print(f"Results saved in {os.path.join('blood_cell_detection', 'train')}")
+        
+        # Save final model
+        model.save(weights_path)
+        
+        return results
+        
+    except Exception as e:
+        print(f"Error during training: {str(e)}")
+        return None
 
 def apply_lime(image, model, classes):
     """Apply LIME for skin disease explainability"""
@@ -589,12 +691,16 @@ def combined_prediction(image, cnn_model, classes, ai_analysis=None):
             'confidence_spread': 0.0
         }
 
-def plot_metrics(results, save_dir='./plots'):
+def plot_metrics(results: Dict[str, any], save_dir: str = './plots') -> Dict[str, str]:
     """
     Plot metrics for blood cell detection
+    
     Args:
-        results: Detection results from YOLO model
+        results: Detection results from YOLO model containing stats
         save_dir: Directory to save plots
+        
+    Returns:
+        dict: Paths to saved plot files
     """
     os.makedirs(save_dir, exist_ok=True)
     
@@ -602,44 +708,111 @@ def plot_metrics(results, save_dir='./plots'):
     stats = results['stats']
     
     # Create bar plot of cell counts
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 6))
     cell_types = ['RBC', 'WBC', 'Platelets']
     counts = [stats['RBC_count'], stats['WBC_count'], stats['Platelet_count']]
     colors = ['#ef5350', '#42a5f5', '#66bb6a']
     
     plt.bar(cell_types, counts, color=colors)
-    plt.title('Blood Cell Count Distribution')
-    plt.ylabel('Count')
+    plt.title('Blood Cell Count Distribution', fontsize=14, pad=20)
+    plt.ylabel('Count', fontsize=12)
     plt.grid(True, alpha=0.3)
     
     # Add count labels on top of bars
     for i, count in enumerate(counts):
-        plt.text(i, count, str(count), ha='center', va='bottom')
+        plt.text(i, count, str(count), 
+                horizontalalignment='center', 
+                verticalalignment='bottom')
     
-    plt.savefig(os.path.join(save_dir, 'cell_counts.png'))
+    counts_path = os.path.join(save_dir, 'cell_counts.png')
+    plt.savefig(counts_path, dpi=300, bbox_inches='tight')
     plt.close()
     
     # Create confidence score plot
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 6))
     conf_scores = [stats['confidence_scores'][cell_type] for cell_type in cell_types]
     
     plt.bar(cell_types, conf_scores, color=colors)
-    plt.title('Detection Confidence Scores')
-    plt.ylabel('Average Confidence')
+    plt.title('Detection Confidence Scores', fontsize=14, pad=20)
+    plt.ylabel('Average Confidence', fontsize=12)
     plt.ylim(0, 1)
     plt.grid(True, alpha=0.3)
     
     # Add confidence score labels
     for i, score in enumerate(conf_scores):
-        plt.text(i, score, f'{score:.2f}', ha='center', va='bottom')
+        plt.text(i, score, f'{score:.2%}',
+                horizontalalignment='center',
+                verticalalignment='bottom')
     
-    plt.savefig(os.path.join(save_dir, 'confidence_scores.png'))
+    conf_path = os.path.join(save_dir, 'confidence_scores.png')
+    plt.savefig(conf_path, dpi=300, bbox_inches='tight')
     plt.close()
     
     return {
-        'cell_counts_plot': os.path.join(save_dir, 'cell_counts.png'),
-        'confidence_plot': os.path.join(save_dir, 'confidence_scores.png')
+        'cell_counts_plot': counts_path,
+        'confidence_plot': conf_path
     }
+
+def plot_detection_results(image: np.ndarray, detections: dict, 
+                         output_path: str = None) -> str:
+    """
+    Plot blood cell detection results on the image
+    
+    Args:
+        image: Original image as numpy array
+        detections: Dictionary containing detection results
+        output_path: Optional path to save the visualization
+        
+    Returns:
+        str: Path to saved visualization if output_path provided
+    """
+    try:
+        plt.figure(figsize=(15, 10))
+        plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        
+        colors = {
+            'RBC': '#ef5350',      # Red
+            'WBC': '#42a5f5',      # Blue
+            'Platelets': '#66bb6a'  # Green
+        }
+        
+        # Plot detections for each cell type
+        for cell_type, boxes in detections.items():
+            color = colors.get(cell_type)
+            for box in boxes:
+                x1, y1, x2, y2, conf = box
+                
+                # Draw bounding box
+                rect = plt.Rectangle((x1, y1), x2-x1, y2-y1,
+                                   fill=False, color=color,
+                                   linewidth=2)
+                plt.gca().add_patch(rect)
+                
+                # Add label
+                plt.text(x1, y1-5, f'{cell_type} {conf:.2f}',
+                        color=color, fontsize=10,
+                        bbox=dict(facecolor='white',
+                                alpha=0.8,
+                                edgecolor=None))
+        
+        plt.axis('off')
+        
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            return output_path
+        else:
+            # Create temporary file
+            import tempfile
+            temp_path = os.path.join(tempfile.gettempdir(),
+                                   'blood_cell_detection.png')
+            plt.savefig(temp_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            return temp_path
+            
+    except Exception as e:
+        print(f"Error plotting detection results: {e}")
+        return None
     plot_paths = []
     
     try:
@@ -699,17 +872,84 @@ def plot_metrics(results, save_dir='./plots'):
                 for i, class_name in enumerate(classes):
                     y_true_binary = [1 if label == i else 0 for label in y_true]
                     y_score_binary = [score[i] for score in y_score]
-                    fpr, tpr, _ = roc_curve(y_true_binary, y_score_binary)
-                    roc_auc = auc(fpr, tpr)
-                    plt.plot(fpr, tpr, label=f'{class_name} (AUC = {roc_auc:.2f})')
-                
-                plt.plot([0, 1], [0, 1], 'k--')
-                plt.xlim([0.0, 1.0])
-                plt.ylim([0.0, 1.05])
-                plt.xlabel('False Positive Rate')
-                plt.ylabel('True Positive Rate')
-                plt.title('ROC Curves')
-                plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+                    
+def analyze_blood_metrics(detection_results: dict) -> dict:
+    """
+    Analyze blood cell metrics and ratios from detection results
+    
+    Args:
+        detection_results: Dictionary containing detection counts and confidence scores
+        
+    Returns:
+        dict: Analysis results including ratios and flags for abnormal values
+    """
+    try:
+        stats = detection_results['stats']
+        rbc_count = stats['RBC_count']
+        wbc_count = stats['WBC_count']
+        platelet_count = stats['Platelet_count']
+        
+        # Calculate ratios
+        wbc_rbc_ratio = wbc_count / rbc_count if rbc_count > 0 else 0
+        platelet_rbc_ratio = platelet_count / rbc_count if rbc_count > 0 else 0
+        
+        # Normal ranges (approximate values, should be adjusted based on specific requirements)
+        normal_ranges = {
+            'WBC_RBC_ratio': (0.001, 0.01),  # Typical WBC:RBC ratio range
+            'Platelet_RBC_ratio': (0.02, 0.2),  # Typical Platelet:RBC ratio range
+        }
+        
+        # Check for abnormalities
+        analysis = {
+            'ratios': {
+                'WBC_RBC_ratio': wbc_rbc_ratio,
+                'Platelet_RBC_ratio': platelet_rbc_ratio
+            },
+            'flags': {
+                'low_RBC': rbc_count < 10,  # Arbitrary threshold, adjust as needed
+                'high_WBC': wbc_rbc_ratio > normal_ranges['WBC_RBC_ratio'][1],
+                'low_WBC': wbc_rbc_ratio < normal_ranges['WBC_RBC_ratio'][0],
+                'high_platelets': platelet_rbc_ratio > normal_ranges['Platelet_RBC_ratio'][1],
+                'low_platelets': platelet_rbc_ratio < normal_ranges['Platelet_RBC_ratio'][0]
+            },
+            'interpretation': []
+        }
+        
+        # Generate interpretation
+        if analysis['flags']['low_RBC']:
+            analysis['interpretation'].append("Low RBC count detected - possible anemia")
+        if analysis['flags']['high_WBC']:
+            analysis['interpretation'].append("Elevated WBC count - possible infection or inflammation")
+        if analysis['flags']['low_WBC']:
+            analysis['interpretation'].append("Low WBC count - possible immunodeficiency")
+        if analysis['flags']['high_platelets']:
+            analysis['interpretation'].append("Elevated platelet count - possible thrombocytosis")
+        if analysis['flags']['low_platelets']:
+            analysis['interpretation'].append("Low platelet count - possible thrombocytopenia")
+            
+        if not analysis['interpretation']:
+            analysis['interpretation'].append("All cell counts appear to be within normal ranges")
+            
+        return analysis
+        
+    except Exception as e:
+        print(f"Error analyzing blood metrics: {e}")
+        return {
+            'ratios': {},
+            'flags': {},
+            'interpretation': ["Error analyzing blood cell metrics"]
+        }
+            fpr, tpr, _ = roc_curve(y_true_binary, y_score_binary)
+            roc_auc = auc(fpr, tpr)
+            plt.plot(fpr, tpr, label=f'{class_name} (AUC = {roc_auc:.2f})')
+            
+            plt.plot([0, 1], [0, 1], 'k--')
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0.0, 1.05])
+            plt.xlabel('False Positive Rate')
+            plt.ylabel('True Positive Rate')
+            plt.title('ROC Curves')
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             
             plt.tight_layout()
             performance_plot_path = "skin_performance_summary.png"
@@ -723,55 +963,73 @@ def plot_metrics(results, save_dir='./plots'):
         print(f"Error plotting metrics: {e}")
         return []
 
-def create_evaluation_dashboard(y_true, y_score, all_labels, all_predictions, classes, train_accuracies, val_accuracies, train_losses, val_losses):
-    """Create comprehensive evaluation dashboard for skin disease detection"""
-    dashboard_paths = {}
+def create_evaluation_plots(detection_results: Dict[str, any],
+                      save_dir: str = './plots') -> Dict[str, str]:
+    """
+    Create evaluation plots for blood cell detection
+    
+    Args:
+        detection_results: Detection results from model
+        save_dir: Directory to save plots
+        
+    Returns:
+        dict: Paths to saved plot files
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    plot_paths = {}
     
     try:
-        # ROC Curves
-        if len(classes) > 2:
-            plt.figure(figsize=(12, 8))
-            for i, class_name in enumerate(classes):
-                y_true_binary = [1 if label == i else 0 for label in y_true]
-                y_score_binary = [score[i] for score in y_score]
-                fpr, tpr, _ = roc_curve(y_true_binary, y_score_binary)
-                roc_auc = auc(fpr, tpr)
-                plt.plot(fpr, tpr, label=f'{class_name} (AUC = {roc_auc:.2f})')
-            
-            plt.plot([0, 1], [0, 1], 'k--')
-            plt.xlim([0.0, 1.0])
-            plt.ylim([0.0, 1.05])
-            plt.xlabel('False Positive Rate')
-            plt.ylabel('True Positive Rate')
-            plt.title('Skin Disease Detection - ROC Curves')
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.tight_layout()
-            
-            roc_path = "skin_roc_curves.png"
-            plt.savefig(roc_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            dashboard_paths['roc_curves'] = roc_path
+        stats = detection_results['stats']
+        detections = detection_results['detections']
         
-        # Precision-Recall curves
-        if len(classes) > 2:
-            plt.figure(figsize=(12, 8))
-            for i, class_name in enumerate(classes):
-                y_true_binary = [1 if label == i else 0 for label in y_true]
-                y_score_binary = [score[i] for score in y_score]
-                precision, recall, _ = precision_recall_curve(y_true_binary, y_score_binary)
-                pr_auc = auc(recall, precision)
-                plt.plot(recall, precision, label=f'{class_name} (AUC = {pr_auc:.2f})')
+        # Cell count distribution
+        plt.figure(figsize=(10, 6))
+        cell_types = ['RBC', 'WBC', 'Platelets']
+        counts = [len(detections[cell_type]) for cell_type in cell_types]
+        colors = ['#ef5350', '#42a5f5', '#66bb6a']
+        
+        plt.bar(cell_types, counts, color=colors)
+        plt.title('Blood Cell Distribution', fontsize=14)
+        plt.ylabel('Count')
+        plt.grid(True, alpha=0.3)
+        
+        for i, count in enumerate(counts):
+            plt.text(i, count, str(count), 
+                    horizontalalignment='center',
+                    verticalalignment='bottom')
+        
+        count_path = os.path.join(save_dir, 'cell_distribution.png')
+        plt.savefig(count_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        plot_paths['distribution'] = count_path
+        
+        # Confidence distribution
+        plt.figure(figsize=(10, 6))
+        conf_data = []
+        labels = []
+        
+        for cell_type in cell_types:
+            confidences = [det[4] for det in detections[cell_type]]
+            if confidences:
+                conf_data.append(confidences)
+                labels.extend([cell_type] * len(confidences))
+        
+        if conf_data:
+            plt.boxplot(conf_data, labels=cell_types)
+            plt.title('Detection Confidence Distribution', fontsize=14)
+            plt.ylabel('Confidence Score')
+            plt.grid(True, alpha=0.3)
             
-            plt.xlabel('Recall')
-            plt.ylabel('Precision')
-            plt.title('Skin Disease Detection - Precision-Recall Curves')
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.tight_layout()
-            
-            pr_path = "skin_precision_recall.png"
-            plt.savefig(pr_path, dpi=300, bbox_inches='tight')
+            conf_path = os.path.join(save_dir, 'confidence_distribution.png')
+            plt.savefig(conf_path, dpi=300, bbox_inches='tight')
             plt.close()
-            dashboard_paths['precision_recall'] = pr_path
+            plot_paths['confidence'] = conf_path
+        
+        return plot_paths
+        
+    except Exception as e:
+        print(f"Error creating evaluation plots: {e}")
+        return {}
         
         # Confusion Matrix
         if all_labels and all_predictions:

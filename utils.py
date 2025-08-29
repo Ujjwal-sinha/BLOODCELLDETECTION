@@ -802,11 +802,34 @@ def preprocess_image(img_path, output_path=None):
     """
     Preprocess blood cell images for better detection.
     Applies color normalization and contrast enhancement specifically for blood smear images.
+    
+    Args:
+        img_path (str): Path to the input blood smear image
+        output_path (str, optional): Path to save the preprocessed image
+        
+    Returns:
+        PIL.Image or bool: Preprocessed image if successful, False otherwise
     """
     try:
         # Load image
         img = Image.open(img_path).convert('RGB')
         img_array = np.array(img)
+        
+        # Convert to LAB color space for better contrast enhancement
+        lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
+        
+        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        lab[:,:,0] = clahe.apply(lab[:,:,0])
+        
+        # Convert back to RGB
+        enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+        
+        # Denoise to reduce noise while preserving edges
+        denoised = cv2.fastNlMeansDenoisingColored(enhanced)
+        
+        # Convert back to PIL Image
+        processed_img = Image.fromarray(denoised)
 
         # Convert to LAB color space for better color processing
         lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
