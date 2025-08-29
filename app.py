@@ -7,12 +7,14 @@ import cv2
 import numpy as np
 from PIL import Image
 import os
+from io import BytesIO  # Added to fix NameError
 from models import load_yolo_model, predict_blood_cells
 from utils import (
     load_css, check_image_quality, describe_image, create_lime_visualization,
     create_shap_visualization, create_gradcam_visualization, query_langchain, BloodPDF, gradient_text
 )
 from agents import BloodCellAgent
+import base64
 
 # Set page configuration
 st.set_page_config(page_title="BloodCellAI - Blood Cell Detection", layout="wide")
@@ -32,6 +34,15 @@ if 'ai_analysis' not in st.session_state:
 model_path = "/Users/ujjwalsinha/Blood Cell Detection/yolo11n.pt"
 classes = ['Platelets', 'RBC', 'WBC']
 model = load_yolo_model(model_path, num_classes=len(classes))
+
+# Function to convert image to base64 for HTML rendering
+def image_to_base64(image):
+    """Convert a PIL Image or numpy array to base64 string for HTML embedding"""
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image)
+    buffered = BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode()
 
 # Main app
 def main():
@@ -78,7 +89,12 @@ def main():
 
         # Display uploaded image
         st.markdown('<div class="glass-effect"><h3>Uploaded Image</h3></div>', unsafe_allow_html=True)
-        st.image(image, caption="Uploaded Blood Cell Image", use_column_width=True, output_format='PNG', channels='RGB', cls="zoomable-image")
+        img_base64 = image_to_base64(image)
+        st.markdown(
+            f'<div class="zoomable-image"><img src="data:image/png;base64,{img_base64}" alt="Uploaded Blood Cell Image" style="width:100%;"></div>',
+            unsafe_allow_html=True
+        )
+        st.caption("Uploaded Blood Cell Image")
 
         # Perform detection
         with st.spinner("Detecting blood cells..."):
@@ -102,7 +118,13 @@ def main():
                     cv2.rectangle(img_array, (x1, y1), (x2, y2), color, 2)
                     cv2.putText(img_array, f"{label} {conf:.2f}", (x1, y1-10), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                st.image(img_array, caption="Detected Blood Cells", use_column_width=True, output_format='PNG', channels='RGB', cls="zoomable-image")
+                # Display image with bounding boxes
+                img_base64 = image_to_base64(img_array)
+                st.markdown(
+                    f'<div class="zoomable-image"><img src="data:image/png;base64,{img_base64}" alt="Detected Blood Cells" style="width:100%;"></div>',
+                    unsafe_allow_html=True
+                )
+                st.caption("Detected Blood Cells")
 
             with col2:
                 st.markdown('<div class="compact-card"><h4>Detected Cells</h4></div>', unsafe_allow_html=True)

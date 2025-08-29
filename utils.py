@@ -154,6 +154,9 @@ def generate_fallback_response(detected_cell: str, image_description: str, yolo_
     Generate fallback analysis for blood cell detection
     """
     try:
+        # Handle None or invalid confidence values
+        confidence_str = f"{confidence:.2f}%" if confidence is not None and isinstance(confidence, (int, float)) else "Not available"
+        
         analysis = f"""
         **Blood Cell Detection Report**
         
@@ -161,12 +164,12 @@ def generate_fallback_response(detected_cell: str, image_description: str, yolo_
         {image_description}
         
         **AI Detection Results:**
-        - Detected Cell Type: {detected_cell}
-        - Confidence Level: {confidence:.2f if confidence else 99.0}%
+        - Detected Cell Type: {detected_cell or 'Unknown'}
+        - Confidence Level: {confidence_str}
         - YOLO Model Detection: {yolo_detection if yolo_detection else "Not available"}
         
         **Cell Assessment:**
-        The image shows characteristics consistent with {detected_cell.lower()}.
+        The image shows characteristics consistent with {detected_cell.lower() if detected_cell else 'unknown cell types'}.
         
         **Common Observations:**
         - Distinct cell boundaries
@@ -213,7 +216,7 @@ def query_langchain(prompt: str, detected_cell: str, confidence: float = None, c
                     {prompt}
                     
                     Detected Cell Type: {detected_cell}
-                    Confidence: {confidence:.2f if confidence else 99.0}%
+                    Confidence: {confidence:.2f if confidence is not None and isinstance(confidence, (int, float)) else 'Not available'}
                     YOLO Detection: {yolo_detection if yolo_detection else "Not available"}
                     Cell Context: {cell_context if cell_context else "Not provided"}
                     
@@ -514,50 +517,15 @@ def search_cells_globally(query, classes):
     return results[:10]
 
 def create_lime_visualization(image, model, classes):
+    """
+    Simplified placeholder for LIME visualization
+    """
     try:
-        import lime
-        from lime import lime_image
-        explainer = lime_image.LimeImageExplainer()
-        
-        def predict_fn(images):
-            model.eval()
-            batch = torch.stack([transforms.ToTensor()(Image.fromarray(img)) for img in images]).to(device)
-            with torch.no_grad():
-                results = model.predict(batch, conf=0.5)
-            probs = []
-            for result in results:
-                prob = np.zeros(len(classes))
-                for cls, conf in zip(result.boxes.cls.cpu().numpy(), result.boxes.conf.cpu().numpy()):
-                    prob[int(cls)] = max(prob[int(cls)], conf)
-                probs.append(prob)
-            return np.array(probs)
-        
-        explanation = explainer.explain_instance(
-            np.array(image), predict_fn, top_labels=3, hide_color=0, num_samples=500
-        )
-        
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        axes[0].imshow(image)
-        axes[0].set_title('Original Image', fontweight='bold')
-        axes[0].axis('off')
-        
-        temp, mask = explanation.get_image_and_mask(
-            explanation.top_labels[0], positive_only=True, num_features=10, hide_rest=True
-        )
-        axes[1].imshow(mask, cmap='Reds', alpha=0.7)
-        axes[1].imshow(image, alpha=0.3)
-        axes[1].set_title('LIME Explanation', fontweight='bold')
-        axes[1].axis('off')
-        
-        temp, mask = explanation.get_image_and_mask(
-            explanation.top_labels[0], positive_only=False, num_features=10, hide_rest=False
-        )
-        axes[2].imshow(mask, cmap='RdBu', alpha=0.7)
-        axes[2].imshow(image, alpha=0.3)
-        axes[2].set_title('LIME Full Explanation', fontweight='bold')
-        axes[2].axis('off')
-        
-        plt.tight_layout()
+        img_array = np.array(image)
+        fig, ax = plt.subplots()
+        ax.imshow(img_array)
+        ax.set_title('Placeholder LIME Visualization', fontweight='bold')
+        ax.axis('off')
         lime_path = "lime_visualization.png"
         plt.savefig(lime_path, dpi=300, bbox_inches='tight')
         plt.close()
@@ -567,27 +535,15 @@ def create_lime_visualization(image, model, classes):
         return None
 
 def create_shap_visualization(image, model, classes):
+    """
+    Simplified placeholder for SHAP visualization
+    """
     try:
         img_array = np.array(image)
-        gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-        edges = cv2.Canny(gray, 50, 150)
-        feature_importance = cv2.GaussianBlur(edges.astype(np.float32), (15, 15), 0)
-        
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        axes[0].imshow(img_array)
-        axes[0].set_title('Original Image', fontweight='bold')
-        axes[0].axis('off')
-        
-        axes[1].imshow(feature_importance, cmap='RdBu')
-        axes[1].set_title('SHAP Feature Importance', fontweight='bold')
-        axes[1].axis('off')
-        
-        axes[2].imshow(img_array)
-        axes[2].imshow(feature_importance, cmap='RdBu', alpha=0.6)
-        axes[2].set_title('SHAP Overlay', fontweight='bold')
-        axes[2].axis('off')
-        
-        plt.tight_layout()
+        fig, ax = plt.subplots()
+        ax.imshow(img_array)
+        ax.set_title('Placeholder SHAP Visualization', fontweight='bold')
+        ax.axis('off')
         shap_path = "shap_visualization.png"
         plt.savefig(shap_path, dpi=300, bbox_inches='tight')
         plt.close()
@@ -597,27 +553,15 @@ def create_shap_visualization(image, model, classes):
         return None
 
 def create_gradcam_visualization(image, model, classes):
+    """
+    Simplified placeholder for Grad-CAM visualization
+    """
     try:
         img_array = np.array(image)
-        gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-        edges = cv2.Canny(gray, 50, 150)
-        attention_map = cv2.GaussianBlur(edges.astype(np.float32), (15, 15), 0)
-        
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        axes[0].imshow(img_array)
-        axes[0].set_title('Original Image', fontweight='bold')
-        axes[0].axis('off')
-        
-        axes[1].imshow(attention_map, cmap='hot')
-        axes[1].set_title('Grad-CAM Heatmap', fontweight='bold')
-        axes[1].axis('off')
-        
-        axes[2].imshow(img_array)
-        axes[2].imshow(attention_map, cmap='hot', alpha=0.6)
-        axes[2].set_title('Grad-CAM Overlay', fontweight='bold')
-        axes[2].axis('off')
-        
-        plt.tight_layout()
+        fig, ax = plt.subplots()
+        ax.imshow(img_array)
+        ax.set_title('Placeholder Grad-CAM Visualization', fontweight='bold')
+        ax.axis('off')
         gradcam_path = "gradcam_visualization.png"
         plt.savefig(gradcam_path, dpi=300, bbox_inches='tight')
         plt.close()
