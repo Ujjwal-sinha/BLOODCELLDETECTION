@@ -1,0 +1,16 @@
+
+# Fracture Classification Dataset Configuration
+path: /kaggle/input/blood-cell-detection-datatset
+train: train/images
+val: valid/images
+test: test/images
+
+# Number of classes
+nc: 3
+
+# Class names
+names:
+  0: Platelets
+  1: RBC
+  2: WBC
+
