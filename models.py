@@ -117,8 +117,6 @@ def preprocess_image(img, output_path=None):
     except Exception as e:
         print(f"Error preprocessing image: {e}")
         return None
-        return False
-
 def augment_with_blur(img_path, output_path, blur_radius=2):
     """Create blurred version for data augmentation"""
     try:
@@ -208,36 +206,36 @@ class BloodCellDataset(Dataset):
         
         return image, targets
 
-def load_yolo_model(model_path='yolo11n.pt'):
+def load_cnn_model(num_classes=3, model_path=None):
     """
-    Load YOLO model for blood cell detection
+    Load CNN model for blood cell classification
     """
     try:
-        from ultralytics import YOLO
+        # Create a ResNet-based model for blood cell classification
+        model = models.resnet18(pretrained=True)
         
-        # Load the YOLO model
-        model = YOLO(model_path)
+        # Modify the final layer for blood cell classes
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
         
-        # Configure model settings for blood cell detection
-        model.conf = 0.25  # Confidence threshold
-        model.iou = 0.45   # NMS IoU threshold
+        # Load pre-trained weights if available
+        if model_path and os.path.exists(model_path):
+            try:
+                state_dict = torch.load(model_path, map_location='cpu')
+                model.load_state_dict(state_dict)
+                print(f"Loaded pre-trained model from {model_path}")
+            except Exception as e:
+                print(f"Error loading model weights: {e}")
+        
+        # Move model to device
+        model = model.to(device)
+        model.eval()
         
         return model
     except Exception as e:
-        print(f"Error loading YOLO model: {e}")
+        print(f"Error loading CNN model: {e}")
         return None
-        try:
-            # Load to CPU first, then move to device
-            state_dict = torch.load(model_path, map_location='cpu')
-            model.load_state_dict(state_dict)
-            print(f"Loaded pre-trained model from {model_path}")
-        except Exception as e:
-            print(f"Error loading model: {e}")
-    
-    # Move model to device and ensure all parameters are on the same device
-    model = model.to(device)
-    
-    return model
+
+
 
 def train_model(model, train_loader, val_loader, num_epochs=10, learning_rate=0.001, device='cpu'):
     """
@@ -410,6 +408,10 @@ def detect_blood_cells(model, image_path):
         Dictionary containing detection results
     """
     try:
+        if model is None:
+            print("YOLO model is not available")
+            return None
+            
         # Run inference
         results = model(image_path)
         
@@ -422,17 +424,25 @@ def detect_blood_cells(model, image_path):
         
         # Extract detection results
         for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()  # get box coordinates
-                conf = box.conf[0].item()  # confidence score
-                cls = int(box.cls[0].item())  # class id
-                cls_name = model.names[cls]  # class name
-                
-                detections[cls_name].append({
-                    'bbox': [x1, y1, x2, y2],
-                    'confidence': conf
-                })
+            if hasattr(r, 'boxes') and r.boxes is not None:
+                boxes = r.boxes
+                for box in boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()  # get box coordinates
+                    conf = box.conf[0].item()  # confidence score
+                    cls = int(box.cls[0].item())  # class id
+                    
+                    # Map class index to class name
+                    class_names = ['RBC', 'WBC', 'Platelets']  # Default mapping
+                    if hasattr(model, 'names') and model.names:
+                        class_names = list(model.names.values())
+                    
+                    if cls < len(class_names):
+                        cls_name = class_names[cls]
+                        
+                        detections[cls_name].append({
+                            'bbox': [x1, y1, x2, y2],
+                            'confidence': conf
+                        })
         
         # Calculate statistics
         stats = {
@@ -813,6 +823,73 @@ def plot_detection_results(image: np.ndarray, detections: dict,
     except Exception as e:
         print(f"Error plotting detection results: {e}")
         return None
+
+def analyze_blood_metrics(detection_results: dict) -> dict:
+    """
+    Analyze blood cell metrics and ratios from detection results
+    
+    Args:
+        detection_results: Dictionary containing detection counts and confidence scores
+        
+    Returns:
+        dict: Analysis results including ratios and flags for abnormal values
+    """
+    try:
+        stats = detection_results['stats']
+        rbc_count = stats['RBC_count']
+        wbc_count = stats['WBC_count']
+        platelet_count = stats['Platelet_count']
+        
+        # Calculate ratios
+        wbc_rbc_ratio = wbc_count / rbc_count if rbc_count > 0 else 0
+        platelet_rbc_ratio = platelet_count / rbc_count if rbc_count > 0 else 0
+        
+        # Normal ranges (approximate values, should be adjusted based on specific requirements)
+        normal_ranges = {
+            'WBC_RBC_ratio': (0.001, 0.01),  # Typical WBC:RBC ratio range
+            'Platelet_RBC_ratio': (0.02, 0.2),  # Typical Platelet:RBC ratio range
+        }
+        
+        # Check for abnormalities
+        analysis = {
+            'ratios': {
+                'WBC_RBC_ratio': wbc_rbc_ratio,
+                'Platelet_RBC_ratio': platelet_rbc_ratio
+            },
+            'flags': {
+                'low_RBC': rbc_count < 10,  # Arbitrary threshold, adjust as needed
+                'high_WBC': wbc_rbc_ratio > normal_ranges['WBC_RBC_ratio'][1],
+                'low_WBC': wbc_rbc_ratio < normal_ranges['WBC_RBC_ratio'][0],
+                'high_platelets': platelet_rbc_ratio > normal_ranges['Platelet_RBC_ratio'][1],
+                'low_platelets': platelet_rbc_ratio < normal_ranges['Platelet_RBC_ratio'][0]
+            },
+            'interpretation': []
+        }
+        
+        # Generate interpretation
+        if analysis['flags']['low_RBC']:
+            analysis['interpretation'].append("Low RBC count detected - possible anemia")
+        if analysis['flags']['high_WBC']:
+            analysis['interpretation'].append("Elevated WBC count - possible infection or inflammation")
+        if analysis['flags']['low_WBC']:
+            analysis['interpretation'].append("Low WBC count - possible immunodeficiency")
+        if analysis['flags']['high_platelets']:
+            analysis['interpretation'].append("Elevated platelet count - possible thrombocytosis")
+        if analysis['flags']['low_platelets']:
+            analysis['interpretation'].append("Low platelet count - possible thrombocytopenia")
+            
+        if not analysis['interpretation']:
+            analysis['interpretation'].append("All cell counts appear to be within normal ranges")
+            
+        return analysis
+        
+    except Exception as e:
+        print(f"Error analyzing blood metrics: {e}")
+        return {
+            'ratios': {},
+            'flags': {},
+            'interpretation': ["Error analyzing blood cell metrics"]
+        }
     plot_paths = []
     
     try:

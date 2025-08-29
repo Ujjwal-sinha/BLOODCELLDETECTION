@@ -33,7 +33,7 @@ from utils import (
 
 # Import AI agents if available
 try:
-    from agents import BloodCellDetectionAgent
+    from agents import BloodCellAIAgent, create_agent_instance
     AGENTS_AVAILABLE = True
 except ImportError:
     AGENTS_AVAILABLE = False
@@ -51,7 +51,12 @@ def load_detection_model():
         st.error(f"Error loading model: {str(e)}")
         return None
 
-model = load_detection_model()
+# Load environment variables
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Initialize YOLO model for blood cell detection
+yolo_model = load_detection_model()
+
 if not GROQ_API_KEY:
     GROQ_API_KEY = st.sidebar.text_input("Enter GROQ API Key", type="password")
     if not GROQ_API_KEY:
@@ -60,11 +65,12 @@ if not GROQ_API_KEY:
 
 st.write(f"Using device: {device}")
 
-# Load BLIP models
-processor, model = load_models()
-if not processor or not model:
-    st.error("Critical error: BLIP models failed to load. Please try again later.")
-    st.stop()
+# Load BLIP models for image description
+from utils import load_models
+processor, blip_model = load_models()
+if not processor or not blip_model:
+    st.warning("BLIP models not available. Image descriptions will be limited.")
+    processor, blip_model = None, None
 
 # Initialize session state
 if 'report_data' not in st.session_state:
@@ -83,7 +89,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Dataset validation
-dataset_dir = "Dataset"
+dataset_dir = "dataset"  # Changed to lowercase to match the file structure
 is_valid, message = validate_dataset(dataset_dir)
 if not is_valid:
     st.error(f"Dataset validation failed: {message}")
@@ -145,10 +151,10 @@ with st.sidebar:
         <p style="color: #4a5568; font-weight: 500;">Advanced AI-Powered Blood Cell Detection Platform combines:</p>
         <ul style="color: #4a5568; font-weight: 500;">
             <li>🔍 Advanced computer vision</li>
-            <li>🩺 Dermatological expertise</li>
+            <li>🩸 Hematological expertise</li>
             <li>🤖 AI-powered analysis</li>
         </ul>
-        <p style="color: #4a5568; font-weight: 500;">For accurate detection of skin diseases and health assessment.</p>
+        <p style="color: #4a5568; font-weight: 500;">For accurate detection and counting of blood cells (RBC, WBC, Platelets).</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -169,24 +175,23 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    if st.button("🚀 Train Model", key="train_button"):
-        with st.spinner("Training model... This may take several minutes."):
+    if st.button("🚀 Train YOLO Model", key="train_button"):
+        with st.spinner("Training YOLO model for blood cell detection... This may take several minutes."):
             try:
-                from models import force_retrain_model
-                model, train_losses, val_losses, train_accuracies, val_accuracies = force_retrain_model(
-                    epochs=epochs, patience=patience, verbose=True, classes=classes
+                from models import train_blood_cell_detector
+                results = train_blood_cell_detector(
+                    data_dir=dataset_dir,
+                    epochs=epochs,
+                    batch_size=16
                 )
                 
-                if model is not None:
-                    st.success("✅ Model training completed successfully!")
+                if results is not None:
+                    st.success("✅ YOLO model training completed successfully!")
                     st.session_state.model_trained = True
                     
                     # Store training data for visualization
                     st.session_state.evaluation_data = {
-                        'train_losses': train_losses,
-                        'val_losses': val_losses,
-                        'train_accuracies': train_accuracies,
-                        'val_accuracies': val_accuracies
+                        'training_results': results
                     }
                 else:
                     st.error("❌ Model training failed")
@@ -208,12 +213,13 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
+    # Count images in train/valid/test splits
     class_counts = {}
-    for cls in classes:
-        class_path = os.path.join(dataset_dir, cls)
-        if os.path.exists(class_path):
-            images = [f for f in os.listdir(class_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-            class_counts[cls] = len(images)
+    for split in ['train', 'valid', 'test']:
+        split_path = os.path.join(dataset_dir, split, 'images')
+        if os.path.exists(split_path):
+            images = [f for f in os.listdir(split_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            class_counts[f"{split.title()} Images"] = len(images)
     
     # Display class counts with better formatting
     st.markdown("""
@@ -232,6 +238,7 @@ with st.sidebar:
         """, unsafe_allow_html=True)
     
     # Test GROQ API status
+    from utils import test_groq_api
     api_working = False
     api_message = "Testing..."
     
@@ -259,41 +266,51 @@ st.markdown("""
     <div style="text-align: center; color: #2d3748;">
         <div style="font-size: 2rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center;">📁</div>
         <h2 style="font-family: 'Inter', sans-serif; margin-bottom: 0.3rem; font-size: 1.8rem; font-weight: 700; color: #2d3748;">
-            Skin Disease Analysis
+            Blood Cell Analysis
         </h2>
         <p style="font-size: 1rem; margin: 0; color: #4a5568; font-weight: 500;">
-            🚀 AI-Powered Analysis • 📁 Image Upload • 🎯 Smart Detection
+            🚀 AI-Powered Analysis • 📁 Image Upload • 🩸 Blood Cell Detection
         </p>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# Global Search Section
+# Blood Cell Information Section
 st.markdown("""
 <div style="background: rgba(255, 255, 255, 0.9); padding: 1.5rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
     <h3 style="color: #2d3748; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-        🔍 Global Disease Search
+        🩸 Blood Cell Information
     </h3>
-    <p style="color: #4a5568; margin-bottom: 1rem;">Search for skin diseases by name, symptoms, or type</p>
+    <p style="color: #4a5568; margin-bottom: 1rem;">Learn about different blood cell types and their functions</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Search functionality
-search_query = st.text_input("🔍 Search diseases:", placeholder="e.g., melanoma, actinic keratosis, dermatitis...")
+# Blood cell information
+col1, col2, col3 = st.columns(3)
 
-if search_query:
-    search_results = search_diseases_globally(search_query, classes)
-    if search_results:
-        st.markdown("### 📋 Search Results")
-        for result in search_results:
-            st.markdown(f"""
-            <div style="background: rgba(72, 187, 120, 0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #48bb78;">
-                <strong style="color: #2d3748;">{result['name']}</strong><br>
-                <span style="color: #4a5568; font-size: 0.9rem;">Type: {result['type']} | Description: {result['description']}</span>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.warning("No diseases found matching your search. Try different keywords.")
+with col1:
+    st.markdown("""
+    <div style="background: rgba(239, 83, 80, 0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #ef5350;">
+        <strong style="color: #2d3748;">🔴 Red Blood Cells (RBC)</strong><br>
+        <span style="color: #4a5568; font-size: 0.9rem;">Function: Oxygen transport<br>Normal Count: 4.5-5.5 million/μL</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown("""
+    <div style="background: rgba(66, 165, 245, 0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #42a5f5;">
+        <strong style="color: #2d3748;">⚪ White Blood Cells (WBC)</strong><br>
+        <span style="color: #4a5568; font-size: 0.9rem;">Function: Immune defense<br>Normal Count: 4,500-11,000/μL</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    st.markdown("""
+    <div style="background: rgba(102, 187, 106, 0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #66bb6a;">
+        <strong style="color: #2d3748;">🟢 Platelets</strong><br>
+        <span style="color: #4a5568; font-size: 0.9rem;">Function: Blood clotting<br>Normal Count: 150,000-450,000/μL</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Image input section
 col1, col2 = st.columns([3, 2])
@@ -303,8 +320,8 @@ with col1:
     <div class="compact-card">
         <div style="text-align: center; margin-bottom: 1rem;">
             <div style="font-size: 1.5rem; margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: center;">📁</div>
-            <h4 style="color: #2d3748; margin: 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.1rem;">Upload Skin Image</h4>
-            <p style="color: #4a5568; margin: 0.3rem 0 0 0; font-size: 0.85rem; font-weight: 500;">Upload a skin image for disease analysis</p>
+            <h4 style="color: #2d3748; margin: 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.1rem;">Upload Blood Smear Image</h4>
+            <p style="color: #4a5568; margin: 0.3rem 0 0 0; font-size: 0.85rem; font-weight: 500;">Upload a blood smear image for cell analysis</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -318,8 +335,8 @@ with col1:
             <div style="background: linear-gradient(135deg, #48bb78, #38a169); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 6px 20px rgba(72, 187, 120, 0.3);">
                 <span style="font-size: 1.5rem; color: white; display: flex; align-items: center; justify-content: center;">📁</span>
             </div>
-            <h5 style="color: #2d3748; margin-bottom: 0.5rem; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.1rem;">Upload Skin Image</h5>
-            <p style="color: #4a5568; font-size: 0.9rem; margin-bottom: 1rem; font-family: 'Inter', sans-serif; font-weight: 500;">Select an image file from your device</p>
+            <h5 style="color: #2d3748; margin-bottom: 0.5rem; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.1rem;">Upload Blood Smear Image</h5>
+            <p style="color: #4a5568; font-size: 0.9rem; margin-bottom: 1rem; font-family: 'Inter', sans-serif; font-weight: 500;">Select a blood smear image from your device</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -327,7 +344,7 @@ with col1:
     img_file = st.file_uploader(
         "Choose a file",
         type=['png', 'jpg', 'jpeg'],
-        help="Upload a skin image for disease analysis",
+        help="Upload a blood smear image for cell analysis",
         label_visibility="collapsed"
     )
     
@@ -350,14 +367,14 @@ with col2:
         </div>
         """, unsafe_allow_html=True)
         
-        st.image(image, caption="Skin Image", use_column_width=True)
+        st.image(image, caption="Blood Smear Image", use_column_width=True)
         
         st.markdown("""
         <div style="background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); padding: 1.5rem; border-radius: 15px; margin: 1.5rem 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); border: none;">
             <div style="text-align: center;">
                 <div style="font-size: 2rem; margin-bottom: 0.5rem;">📷</div>
                 <h4 style="color: #ffffff; margin: 0 0 0.5rem 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.3rem;">Image Ready for Analysis</h4>
-                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 1rem; font-family: 'Inter', sans-serif;">Your image is ready for comprehensive skin disease analysis.</p>
+                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 1rem; font-family: 'Inter', sans-serif;">Your blood smear image is ready for comprehensive cell analysis.</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -387,145 +404,182 @@ st.markdown("""
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    disease_analysis = st.checkbox(
-        "🔍 Skin Disease Analysis",
-        help="Detect skin diseases and conditions",
-        key="disease_checkbox"
+    cell_detection = st.checkbox(
+        "🔍 Blood Cell Detection",
+        help="Detect and count blood cells (RBC, WBC, Platelets)",
+        key="detection_checkbox"
     )
 
 with col2:
-    health_analysis = st.checkbox(
-        "🩺 Skin Health Assessment",
-        help="Comprehensive skin health evaluation",
-        key="health_checkbox"
+    morphology_analysis = st.checkbox(
+        "🩸 Cell Morphology Analysis",
+        help="Analyze cell shape, size, and characteristics",
+        key="morphology_checkbox"
     )
 
 with col3:
-    combined_analysis = st.checkbox(
-        "🔬 Combined Analysis",
-        help="Complete skin health and disease assessment",
-        key="combined_checkbox"
+    complete_analysis = st.checkbox(
+        "🔬 Complete Blood Analysis",
+        help="Full blood cell detection and morphology assessment",
+        key="complete_checkbox"
     )
 
 # Analyze button
 if st.button("🔬 Start Analysis", type="primary", key="analyze_button"):
     if not image:
-        st.warning("Please upload an image or capture one using the camera.")
+        st.warning("Please upload a blood smear image first.")
         st.stop()
     
     selected_analyses = []
-    if disease_analysis:
-        selected_analyses.append("disease")
-    if health_analysis:
-        selected_analyses.append("health")
-    if combined_analysis:
-        selected_analyses.append("combined")
+    if cell_detection:
+        selected_analyses.append("detection")
+    if morphology_analysis:
+        selected_analyses.append("morphology")
+    if complete_analysis:
+        selected_analyses.append("complete")
     
     if not selected_analyses:
         st.warning("Please select at least one analysis type.")
         st.stop()
     
-    # Run selected analyses
-    for analysis_type in selected_analyses:
-        with st.spinner(f"Processing {analysis_type} analysis..."):
-            try:
-                # Check image quality
-                quality_score = check_image_quality(image)
-                
-                # Describe image using BLIP
-                image_description = describe_image(image)
-                
-                # Load and run combined model (CNN + AI)
-                if debug_mode:
-                    st.info(f"🔍 Debug: Loading model for {len(classes)} classes: {classes}")
-                
-                model = load_cnn_model(num_classes=len(classes))
-                if model is not None:
-                    if debug_mode:
-                        st.info("🔍 Debug: Model loaded successfully")
+    # Run blood cell analysis
+    with st.spinner("Analyzing blood smear image..."):
+        try:
+            # Check image quality
+            quality_score = check_image_quality(image)
+            
+            # Describe image using BLIP
+            from utils import describe_image
+            image_description = describe_image(image) if processor and blip_model else "Blood smear image for analysis"
+            
+            # Use YOLO model for blood cell detection
+            if yolo_model is not None:
+                # Save image temporarily for YOLO processing
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+                    image.save(tmp_file.name)
                     
-                    # Use combined prediction for better accuracy
-                    prediction_result = combined_prediction(image, model, classes, ai_analysis=True)
-                    predicted_class = prediction_result['predicted_class']
-                    confidence = prediction_result['confidence']
-                    cnn_confidence = prediction_result['cnn_confidence']
-                    ai_enhanced = prediction_result['ai_enhanced']
+                    # Run YOLO detection
+                    from models import detect_blood_cells
+                    detection_results = detect_blood_cells(yolo_model, tmp_file.name)
                     
-                    if debug_mode:
-                        st.info(f"🔍 Debug: Prediction result: {prediction_result}")
+                    # Clean up temp file
+                    os.unlink(tmp_file.name)
+                
+                if detection_results:
+                    stats = detection_results['stats']
+                    detections = detection_results['detections']
                     
-                    # For low confidence, show only the best prediction
-                    if confidence < 0.7 and prediction_result.get('top3_predictions'):
-                        predicted_class = prediction_result['top3_predictions'][0][0]  # Get the best prediction
-                        if debug_mode:
-                            st.info(f"🔍 Debug: Using best prediction: {predicted_class}")
+                    # Create analysis prompt for AI agent
+                    detected_cells = []
+                    confidences = []
+                    count_data = {}
+                    
+                    for cell_type in ['RBC', 'WBC', 'Platelets']:
+                        count = stats[f'{cell_type}_count']
+                        if count > 0:
+                            detected_cells.append(cell_type)
+                            confidences.append(stats['confidence_scores'][cell_type])
+                            count_data[cell_type] = count
+                    
+                    # Use AI agent for comprehensive analysis
+                    if AGENTS_AVAILABLE and GROQ_API_KEY:
+                        try:
+                            agent = create_agent_instance("blood", GROQ_API_KEY)
+                            ai_analysis = agent.analyze_blood_sample(
+                                image_description=image_description,
+                                detected_cells=detected_cells,
+                                confidences=confidences,
+                                count_data=count_data,
+                                morphology="Automated YOLO detection results"
+                            )
+                            analysis_result = ai_analysis.get("analysis", "Analysis completed")
+                        except Exception as e:
+                            # Fallback analysis
+                            analysis_result = f"""
+                            **Blood Cell Analysis Report**
+                            
+                            **Detection Results:**
+                            - RBC Count: {stats['RBC_count']}
+                            - WBC Count: {stats['WBC_count']}
+                            - Platelet Count: {stats['Platelet_count']}
+                            
+                            **Confidence Scores:**
+                            - RBC Detection: {stats['confidence_scores']['RBC']:.2%}
+                            - WBC Detection: {stats['confidence_scores']['WBC']:.2%}
+                            - Platelet Detection: {stats['confidence_scores']['Platelets']:.2%}
+                            
+                            **Recommendations:**
+                            1. Verify counts with manual analysis
+                            2. Consider complete blood count (CBC) test
+                            3. Consult hematologist if abnormal values detected
+                            4. Monitor trends over time
+                            
+                            **Note:** This is an automated analysis. Professional laboratory verification is recommended.
+                            """
+                    else:
+                        # Basic analysis without AI agent
+                        analysis_result = f"""
+                        **Blood Cell Detection Results**
+                        
+                        **Cell Counts:**
+                        - Red Blood Cells (RBC): {stats['RBC_count']}
+                        - White Blood Cells (WBC): {stats['WBC_count']}
+                        - Platelets: {stats['Platelet_count']}
+                        
+                        **Detection Confidence:**
+                        - RBC: {stats['confidence_scores']['RBC']:.2%}
+                        - WBC: {stats['confidence_scores']['WBC']:.2%}
+                        - Platelets: {stats['confidence_scores']['Platelets']:.2%}
+                        
+                        **Analysis Summary:**
+                        Total cells detected: {sum([stats['RBC_count'], stats['WBC_count'], stats['Platelet_count']])}
+                        
+                        **Recommendations:**
+                        1. Compare with normal reference ranges
+                        2. Consider clinical correlation
+                        3. Verify with laboratory analysis
+                        """
+                    
+                    # Store results
+                    st.session_state.report_data = {
+                        "analysis_type": "blood_cell_detection",
+                        "report": analysis_result,
+                        "image": image,
+                        "image_description": image_description,
+                        "quality_score": quality_score,
+                        "detection_results": detection_results,
+                        "cell_counts": count_data,
+                        "detected_cells": detected_cells,
+                        "confidences": confidences
+                    }
+                    
+                    st.success("✅ Blood cell analysis completed!")
                 else:
-                    if debug_mode:
-                        st.error("🔍 Debug: Model failed to load")
-                    predicted_class = "Model not available"
-                    confidence = 0.99
-                    cnn_confidence = 0.99
-                    ai_enhanced = False
+                    st.error("❌ No blood cells detected in the image")
+            else:
+                st.error("❌ YOLO model not available for detection")
                 
-                # Create analysis prompt
-                prompt = f"""
-                Analyze this skin image for {analysis_type} detection:
-                
-                Image Description: {image_description}
-                Image Quality Score: {quality_score}
-                Combined Detection Result: {predicted_class}
-                Overall Confidence: {confidence:.2f}
-                CNN Confidence: {cnn_confidence:.2f}
-                AI Enhanced: {ai_enhanced}
-                
-                Provide comprehensive analysis including:
-                1. Disease assessment and symptoms
-                2. Treatment recommendations
-                3. Prevention strategies
-                4. Risk assessment
-                5. Follow-up actions
-                6. Confidence level interpretation
-                """
-                
-                # Get AI analysis
-                analysis_result = query_langchain(prompt, predicted_class, confidence, None, predicted_class)
-                
-                # Store results
-                st.session_state.report_data = {
-                    "analysis_type": analysis_type,
-                    "report": analysis_result,
-                    "image": image,
-                    "image_description": image_description,
-                    "quality_score": quality_score,
-                    "cnn_prediction": predicted_class,
-                    "cnn_confidence": confidence,
-                    "cnn_raw_confidence": cnn_confidence,
-                    "ai_enhanced": ai_enhanced,
-                    "top3_predictions": prediction_result.get('top3_predictions', []),
-                    "confidence_spread": prediction_result.get('confidence_spread', 0.0)
-                }
-                
-                st.success(f"✅ {analysis_type} analysis completed!")
-                
-            except Exception as e:
-                st.error(f"❌ Error during {analysis_type} analysis: {str(e)}")
-                continue
+        except Exception as e:
+            st.error(f"❌ Error during blood cell analysis: {str(e)}")
+            if debug_mode:
+                st.exception(e)
 
 # Display results
 if 'report_data' in st.session_state and st.session_state.report_data is not None and isinstance(st.session_state.report_data, dict):
     st.markdown("""
     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 15px; margin: 1rem 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); border: none;">
         <h2 style="font-family: 'Poppins', sans-serif; color: #ffffff; margin-bottom: 0.3rem; text-align: center; font-size: 1.8rem;">🎉 Analysis Complete!</h2>
-        <p style="color: rgba(255, 255, 255, 0.9); text-align: center; font-size: 1rem; margin-bottom: 0;">Your comprehensive skin disease analysis is ready</p>
+        <p style="color: rgba(255, 255, 255, 0.9); text-align: center; font-size: 1rem; margin-bottom: 0;">Your comprehensive blood cell analysis is ready</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Create tabs for results
     main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs([
-        "📊 Analysis Overview", 
-        "🔬 Detailed Results", 
-        "📋 Medical Report",
-        "🔍 AI Explainability"
+        "📊 Detection Overview", 
+        "🔬 Detailed Analysis", 
+        "📋 Laboratory Report",
+        "📈 Cell Statistics"
     ])
     
     with main_tab1:
@@ -533,7 +587,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
         
         with col1:
             if st.session_state.report_data and "image" in st.session_state.report_data:
-                st.image(st.session_state.report_data["image"], caption="Skin Image Analysis", use_column_width=True)
+                st.image(st.session_state.report_data["image"], caption="Blood Smear Analysis", use_column_width=True)
             else:
                 st.error("Image data not available")
             
@@ -551,42 +605,33 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
                 st.error("Quality score data not available")
         
         with col2:
-            if st.session_state.report_data and 'cnn_prediction' in st.session_state.report_data:
-                detected_class = st.session_state.report_data['cnn_prediction']
+            # Display cell counts
+            if st.session_state.report_data and 'cell_counts' in st.session_state.report_data:
+                cell_counts = st.session_state.report_data['cell_counts']
+                total_cells = sum(cell_counts.values())
+                
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.2rem; border-radius: 10px; margin: 0.8rem 0; text-align: center; color: white;">
-                    <h5 style="margin: 0 0 0.3rem 0; font-size: 1rem;">Detected Condition</h5>
-                    <p style="margin: 0; font-size: 1.1rem; font-weight: bold;">{detected_class}</p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.error("Detection data not available")
-            
-            if st.session_state.report_data and 'cnn_confidence' in st.session_state.report_data:
-                confidence = st.session_state.report_data['cnn_confidence']
-                
-                if st.session_state.report_data and 'ai_enhanced' in st.session_state.report_data and st.session_state.report_data['ai_enhanced']:
-                    confidence_text = "AI-Enhanced Detection"
-                    confidence_color = "linear-gradient(135deg, #9f7aea 0%, #805ad5 100%)"
-                else:
-                    confidence_text = "CNN Detection"
-                    confidence_color = "linear-gradient(135deg, #48bb78 0%, #38a169 100%)"
-                
-                st.markdown(f"""
-                <div style="background: {confidence_color}; padding: 1.2rem; border-radius: 10px; margin: 0.8rem 0; text-align: center; color: white;">
-                    <h5 style="margin: 0 0 0.3rem 0; font-size: 1rem;">Confidence Level</h5>
-                    <p style="margin: 0; font-size: 1.3rem; font-weight: bold;">99.0%</p>
-                    <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">{confidence_text}</p>
+                    <h5 style="margin: 0 0 0.3rem 0; font-size: 1rem;">Total Cells Detected</h5>
+                    <p style="margin: 0; font-size: 1.3rem; font-weight: bold;">{total_cells}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-
+                # Individual cell counts
+                colors = {'RBC': '#ef5350', 'WBC': '#42a5f5', 'Platelets': '#66bb6a'}
+                for cell_type, count in cell_counts.items():
+                    color = colors.get(cell_type, '#666')
+                    st.markdown(f"""
+                    <div style="background: {color}; padding: 0.8rem; border-radius: 8px; margin: 0.5rem 0; text-align: center; color: white;">
+                        <strong>{cell_type}: {count}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); padding: 1.2rem; border-radius: 10px; margin: 0.8rem 0; text-align: center; color: white;">
-                    <h5 style="margin: 0 0 0.3rem 0; font-size: 1rem;">Confidence Level</h5>
-                     <p style="margin: 0; font-size: 1.3rem; font-weight: bold;">99.0%</p>
-                    <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">High Accuracy Detection</p>
+                    <h5 style="margin: 0 0 0.3rem 0; font-size: 1rem;">Detection Status</h5>
+                     <p style="margin: 0; font-size: 1.1rem; font-weight: bold;">Analysis Complete</p>
+                    <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">YOLO Detection</p>
                 </div>
                 """, unsafe_allow_html=True)
     
@@ -598,7 +643,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
         st.markdown("""
         <div style="background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border-left: 4px solid #48bb78;">
             <h4 style="color: #2d3748; margin-bottom: 0.5rem;">🔬 Detailed Analysis Results</h4>
-            <p style="color: #4a5568; font-size: 0.95rem; margin: 0;">Comprehensive skin disease analysis and recommendations</p>
+            <p style="color: #4a5568; font-size: 0.95rem; margin: 0;">Comprehensive blood cell analysis and recommendations</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -627,6 +672,190 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
     with main_tab3:
         st.markdown("""
         <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
+            <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.3rem;">📋 Complete Blood Cell Report</h3>
+            <p style="color: #4a5568; text-align: center; margin-bottom: 1rem; font-size: 0.95rem;">Full comprehensive analysis report with all details</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.session_state.report_data and "report" in st.session_state.report_data:
+            report_content = st.session_state.report_data["report"]
+        else:
+            report_content = "No analysis report available."
+        
+        # Display complete report
+        st.markdown("""
+        <div style="background: #ffffff; padding: 2rem; border-radius: 12px; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-height: 600px; overflow-y: auto;">
+        """, unsafe_allow_html=True)
+        
+        sections = report_content.split('\n\n')
+        for section in sections:
+            if section.strip():
+                if section.startswith('**') and section.endswith('**'):
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem; border-radius: 8px; margin: 1rem 0; color: white;">
+                        <h5 style="margin: 0; font-size: 1.1rem; text-align: center;">{section}</h5>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.8rem 0; border-left: 3px solid #3182ce;">
+                        <p style="color: #4a5568; line-height: 1.6; margin: 0;">{section}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    with main_tab4:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
+            <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.3rem;">📈 Cell Statistics & Visualizations</h3>
+            <p style="color: #4a5568; text-align: center; margin-bottom: 1rem; font-size: 0.95rem;">Statistical analysis and visualizations of detected blood cells</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Display cell statistics
+        if st.session_state.report_data and 'cell_counts' in st.session_state.report_data:
+            cell_counts = st.session_state.report_data['cell_counts']
+            
+            # Create visualization
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Cell count pie chart
+                try:
+                    import matplotlib.pyplot as plt
+                    
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    colors = ['#ef5350', '#42a5f5', '#66bb6a']
+                    
+                    if cell_counts:
+                        labels = list(cell_counts.keys())
+                        sizes = list(cell_counts.values())
+                        
+                        wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors, 
+                                                         autopct='%1.1f%%', startangle=90)
+                        ax.set_title('Blood Cell Distribution', fontsize=14, fontweight='bold')
+                        
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                        plt.close()
+                    else:
+                        st.info("No cell count data available for visualization")
+                        
+                except Exception as e:
+                    st.error(f"Error creating pie chart: {e}")
+            
+            with col2:
+                # Cell count bar chart
+                try:
+                    import matplotlib.pyplot as plt
+                    
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    
+                    if cell_counts:
+                        cell_types = list(cell_counts.keys())
+                        counts = list(cell_counts.values())
+                        colors = ['#ef5350', '#42a5f5', '#66bb6a']
+                        
+                        bars = ax.bar(cell_types, counts, color=colors)
+                        ax.set_title('Blood Cell Counts', fontsize=14, fontweight='bold')
+                        ax.set_ylabel('Count')
+                        ax.grid(True, alpha=0.3)
+                        
+                        # Add count labels on bars
+                        for bar, count in zip(bars, counts):
+                            height = bar.get_height()
+                            ax.text(bar.get_x() + bar.get_width()/2., height + max(counts)*0.01,
+                                   str(count), ha='center', va='bottom', fontweight='bold')
+                        
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                        plt.close()
+                    else:
+                        st.info("No cell count data available for visualization")
+                        
+                except Exception as e:
+                    st.error(f"Error creating bar chart: {e}")
+            
+            # Display detailed statistics table
+            st.markdown("### 📊 Detailed Cell Statistics")
+            
+            # Normal ranges for reference
+            normal_ranges = {
+                'RBC': '4.5-5.5 million/μL',
+                'WBC': '4,500-11,000/μL', 
+                'Platelets': '150,000-450,000/μL'
+            }
+            
+            # Create comparison table
+            import pandas as pd
+            
+            table_data = []
+            for cell_type, count in cell_counts.items():
+                table_data.append({
+                    'Cell Type': cell_type,
+                    'Detected Count': count,
+                    'Normal Range': normal_ranges.get(cell_type, 'N/A'),
+                    'Status': 'Detected' if count > 0 else 'Not Detected'
+                })
+            
+            df = pd.DataFrame(table_data)
+            st.dataframe(df, use_container_width=True)
+            
+        else:
+            st.info("No statistical data available. Please run an analysis first.")
+        
+        # Performance metrics if available
+        if st.session_state.report_data and 'detection_results' in st.session_state.report_data:
+            detection_results = st.session_state.report_data['detection_results']
+            
+            st.markdown("### 🎯 Detection Performance")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                total_detections = sum(len(detections) for detections in detection_results['detections'].values())
+                st.metric("Total Detections", total_detections)
+            
+            with col2:
+                avg_confidence = sum(detection_results['stats']['confidence_scores'].values()) / 3
+                st.metric("Average Confidence", f"{avg_confidence:.2%}")
+            
+            with col3:
+                quality_score = st.session_state.report_data.get('quality_score', 0)
+                st.metric("Image Quality", f"{quality_score:.2f}")
+
+# Reset button
+st.markdown("""
+<div style="background: #ffffff; padding: 1.5rem; border-radius: 12px; margin: 1rem 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
+    <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; font-size: 1.3rem;">🔄 Reset & Clear</h3>
+    <p style="color: #4a5568; margin-bottom: 1rem; font-size: 0.95rem;">Clear all analysis results and start fresh</p>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("🔄 Reset Analysis", key="reset_button"):
+        keys_to_clear = ['report_data', 'model_trained', 'plot_paths', 'evaluation_data']
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        for file in glob.glob("*.png") + glob.glob("*.jpg"):
+            try:
+                os.remove(file)
+            except:
+                pass
+        clear_mps_cache()
+        st.rerun()
+
+# Report generation
+if 'report_data' in st.session_state and st.session_state.report_data is not None:
+    st.markdown("""
+    <div style="background: #ffffff; padding: 1.5rem; border-radius: 12px; margin: 1rem 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
+        <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; font-size: 1.3rem;">📊 Report Generation</h3>
+        <p style="color: #4a5568; margin-bottom: 1rem; font-size: 0.95rem;">Generate a comprehensive PDF report of your analysis results</p>
+    </div>
+    """, unsafe_allow_html=True) linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
             <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.3rem;">📋 Complete Skin Disease Report</h3>
             <p style="color: #4a5568; text-align: center; margin-bottom: 1rem; font-size: 0.95rem;">Full comprehensive analysis report with all details</p>
         </div>
@@ -915,33 +1144,33 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
     if st.button("📊 Generate Comprehensive PDF Report", key="pdf_button"):
         with st.spinner("Generating professional report..."):
             with tempfile.TemporaryDirectory() as tmp_dir:
-                skin_info = SkinPDF().sanitize_text("Skin disease analysis")
-                pdf = SkinPDF(skin_info=skin_info)
+                from utils import BloodCellPDF
+                
+                blood_info = "Blood cell analysis"
+                pdf = BloodCellPDF(blood_info=blood_info)
                 pdf.cover_page()
                 
-                analysis_type = st.session_state.report_data.get("analysis_type", "combined")
-                if analysis_type == "disease":
-                    pdf.set_title("Skin Disease Analysis Report")
-                elif analysis_type == "health":
-                    pdf.set_title("Skin Health Assessment Report")
-                else:
-                    pdf.set_title("Combined Skin Disease & Health Analysis Report")
-                
+                analysis_type = st.session_state.report_data.get("analysis_type", "blood_cell_detection")
                 pdf.add_summary(st.session_state.report_data["report"])
                 pdf.table_of_contents()
 
+                # Save image temporarily for PDF
                 tmp_path = os.path.join(tmp_dir, f"image_{uuid.uuid4()}.jpg")
                 st.session_state.report_data["image"].save(tmp_path, quality=90, format="JPEG")
                 pdf.add_image(tmp_path)
+
+                # Add cell count table if available
+                if 'cell_counts' in st.session_state.report_data:
+                    pdf.add_cell_count_table(st.session_state.report_data['cell_counts'])
 
                 report = st.session_state.report_data["report"]
                 
                 # Add sections to PDF
                 sections = [
-                    ("Skin Disease Findings", report.split("**Skin Disease Analysis Report**")[1] if "**Skin Disease Analysis Report**" in report else report),
-                    ("Treatment Recommendations", report.split("**Treatment Options**")[1].split("**Prevention Strategies**")[0] if "**Treatment Options**" in report else ""),
-                    ("Prevention Strategies", report.split("**Prevention Strategies**")[1].split("**Follow-up Actions**")[0] if "**Prevention Strategies**" in report else ""),
-                    ("Follow-up Actions", report.split("**Follow-up Actions**")[1] if "**Follow-up Actions**" in report else "")
+                    ("Blood Cell Detection Results", report.split("**Detection Results:**")[1].split("**")[0] if "**Detection Results:**" in report else ""),
+                    ("Cell Count Analysis", report.split("**Cell Counts:**")[1].split("**")[0] if "**Cell Counts:**" in report else ""),
+                    ("Clinical Recommendations", report.split("**Recommendations:**")[1].split("**")[0] if "**Recommendations:**" in report else ""),
+                    ("Quality Assessment", report.split("**Quality Assurance:**")[1].split("**")[0] if "**Quality Assurance:**" in report else "")
                 ]
                 
                 for title, content in sections:
@@ -949,7 +1178,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
                         pdf.add_section(title, content)
                 
                 # Save PDF
-                pdf_path = f"skin_disease_report_{analysis_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                pdf_path = f"blood_cell_report_{analysis_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
                 pdf.output(pdf_path)
                 
                 # Provide download link
@@ -957,12 +1186,12 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
                     pdf_bytes = pdf_file.read()
                 
                 st.download_button(
-                    label=f"📥 Download {analysis_type.replace('_', ' ').title()} Report",
+                    label=f"📥 Download Blood Cell Analysis Report",
                     data=pdf_bytes,
                     file_name=pdf_path,
                     mime="application/pdf",
                 )
-                st.success(f"✅ {analysis_type.replace('_', ' ').title()} report generated successfully!")
+                st.success(f"✅ Blood cell analysis report generated successfully!")
 
 # Footer
 st.markdown("---")

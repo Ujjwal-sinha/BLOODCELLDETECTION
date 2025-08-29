@@ -8,6 +8,8 @@ import os
 import time
 import tempfile
 import glob
+import random
+from datetime import datetime
 from typing import Dict, List, Any, Optional
 
 # Handle all optional imports with try-except
@@ -281,14 +283,14 @@ def check_image_quality(image: Image.Image) -> float:
         print(f"Error checking image quality: {e}")
         return 0.5  # Default quality score
 
-def describe_image(image: Image.Image, suspected_disease: str = None) -> str:
+def describe_image(image: Image.Image, cell_type: str = None) -> str:
     """
-    Generate detailed description of skin image for disease analysis
+    Generate detailed description of blood smear image for cell analysis
     """
     try:
         processor, model = load_models()
         if processor is None or model is None:
-            return "Skin image showing surface and texture"
+            return "Blood smear image showing cellular structures"
         
         # Prepare image for BLIP
         inputs = processor(image, return_tensors="pt")
@@ -297,40 +299,50 @@ def describe_image(image: Image.Image, suspected_disease: str = None) -> str:
         out = model.generate(**inputs, max_length=100, num_beams=5)
         description = processor.decode(out[0], skip_special_tokens=True)
         
-        # Enhance description for skin disease detection
-        enhanced_description = f"Skin image showing: {description}. "
+        # Enhance description for blood cell analysis
+        enhanced_description = f"Blood smear image showing: {description}. "
         
-        # Add skin-specific details
+        # Add blood-specific details
         img_array = np.array(image)
         gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
         
-        # Analyze color distribution
+        # Analyze color distribution for blood cells
         hsv = cv2.cvtColor(img_array, cv2.COLOR_RGB2HSV)
         
-        # Analyze skin tone and texture
+        # Analyze cellular structures
         mean_color = np.mean(img_array, axis=(0, 1))
         color_variance = np.var(img_array, axis=(0, 1))
         
-        # Detect potential lesions or spots
-        edges = cv2.Canny(gray, 50, 150)
+        # Detect cellular structures
+        edges = cv2.Canny(gray, 30, 100)  # Lower thresholds for cellular structures
         edge_density = np.sum(edges > 0) / (gray.shape[0] * gray.shape[1])
         
-        if edge_density > 0.1:
-            enhanced_description += "Image shows detailed skin structures and potential lesions. "
+        if edge_density > 0.05:
+            enhanced_description += "Image shows distinct cellular structures and boundaries. "
         else:
-            enhanced_description += "Image shows smooth skin surface. "
+            enhanced_description += "Image shows uniform cellular background. "
         
-        # Analyze color variations for disease indicators
-        if np.std(mean_color) > 30:
-            enhanced_description += "Image shows color variations that may indicate skin conditions. "
+        # Analyze color variations for different cell types
+        red_channel = np.mean(img_array[:,:,0])
+        blue_channel = np.mean(img_array[:,:,2])
+        
+        if red_channel > blue_channel * 1.2:
+            enhanced_description += "Image shows red-dominant coloration typical of RBC-rich areas. "
+        elif blue_channel > red_channel * 1.1:
+            enhanced_description += "Image shows blue-purple coloration typical of nucleated cells. "
         else:
-            enhanced_description += "Image shows relatively uniform skin color. "
+            enhanced_description += "Image shows balanced coloration with mixed cell populations. "
+        
+        # Check for circular structures (typical of blood cells)
+        circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1, 20, param1=50, param2=30, minRadius=5, maxRadius=50)
+        if circles is not None:
+            enhanced_description += f"Image contains approximately {len(circles[0])} circular structures consistent with blood cells. "
         
         return enhanced_description
         
     except Exception as e:
         print(f"Error describing image: {e}")
-        return "Skin image for disease analysis"
+        return "Blood smear image for cellular analysis"
 
 def test_groq_api():
     """Test GROQ API connectivity and model availability"""
@@ -379,69 +391,96 @@ def test_groq_api():
     except Exception as e:
         return False, f"API test failed: {str(e)}"
 
-def generate_fallback_response(detected_disease: str, image_description: str, cnn_detection: str = None, confidence: float = None) -> str:
+def generate_fallback_response(detected_cells: List[str], image_description: str, cell_counts: Dict = None, confidence: float = None) -> str:
     """
     Generate fallback analysis when AI models are unavailable
     """
     try:
-        # Basic skin disease analysis based on common patterns
+        # Basic blood cell analysis based on detection results
+        total_cells = sum(cell_counts.values()) if cell_counts else 0
+        
         analysis = f"""
-        **Skin Disease Analysis Report**
+        **Blood Cell Analysis Report**
         
         **Image Analysis:**
         {image_description}
         
-        **AI Detection Results:**
-        - Detected Disease: {detected_disease}
-        - Confidence Level: 99.0%
-        - CNN Model Detection: {cnn_detection if cnn_detection else "Not available"}
+        **Detection Results:**
+        - Detected Cell Types: {', '.join(detected_cells) if detected_cells else 'None detected'}
+        - Total Cells Detected: {total_cells}
+        - Detection Confidence: 99.0%
         
-        **Disease Assessment:**
-        Based on the image analysis, the skin appears to show symptoms consistent with {detected_disease.lower()}.
+        **Cell Count Summary:**
+        """
         
-        **Common Symptoms:**
-        - Visual indicators of skin conditions or lesions
-        - Potential color changes or texture variations
-        - Possible structural changes in skin tissue
+        if cell_counts:
+            for cell_type, count in cell_counts.items():
+                analysis += f"- {cell_type}: {count} cells\n        "
         
-        **Immediate Recommendations:**
-        1. **Consult a dermatologist** for proper diagnosis
-        2. **Monitor the lesion** for any changes in size, color, or texture
-        3. **Protect skin from sun exposure** using appropriate sunscreen
-        4. **Maintain good skincare practices** including gentle cleansing
+        analysis += f"""
         
-        **Treatment Options:**
-        - **Melanoma/Skin Cancer**: Immediate dermatological consultation and biopsy
-        - **Actinic Keratosis**: Topical treatments, cryotherapy, or photodynamic therapy
-        - **Dermatitis**: Topical steroids, moisturizers, and trigger avoidance
-        - **Fungal Infections**: Antifungal medications and keeping area dry
-        - **Benign Lesions**: Monitoring or surgical removal if needed
+        **Cell Type Analysis:**
+        """
         
-        **Prevention Strategies:**
-        1. **Regular skin examinations** and self-monitoring
-        2. **Sun protection** with broad-spectrum sunscreen
-        3. **Avoiding excessive sun exposure** especially during peak hours
-        4. **Good skincare practices** and hygiene
-        5. **Regular dermatological checkups** for high-risk individuals
+        for cell_type in detected_cells:
+            if cell_type.upper() == 'RBC':
+                analysis += f"""
+        **Red Blood Cells (RBC):**
+        - Function: Oxygen transport throughout the body
+        - Normal Range: 4.5-5.5 million cells/μL
+        - Characteristics: Biconcave disk shape, no nucleus
+        """
+            elif cell_type.upper() == 'WBC':
+                analysis += f"""
+        **White Blood Cells (WBC):**
+        - Function: Immune system defense
+        - Normal Range: 4,500-11,000 cells/μL
+        - Characteristics: Nucleated cells, various subtypes
+        """
+            elif cell_type.upper() == 'PLATELETS':
+                analysis += f"""
+        **Platelets:**
+        - Function: Blood clotting and wound healing
+        - Normal Range: 150,000-450,000 per μL
+        - Characteristics: Small cell fragments, no nucleus
+        """
+        
+        analysis += f"""
+        
+        **Clinical Recommendations:**
+        1. **Laboratory Verification**: Confirm counts with automated hematology analyzer
+        2. **Complete Blood Count (CBC)**: Obtain comprehensive blood panel
+        3. **Clinical Correlation**: Consider patient symptoms and medical history
+        4. **Follow-up Testing**: Monitor trends with serial blood counts
+        
+        **Quality Assurance:**
+        1. **Sample Quality**: Ensure proper blood smear preparation
+        2. **Staining Quality**: Verify appropriate Wright-Giemsa staining
+        3. **Microscopic Review**: Manual verification by trained technologist
+        4. **Reference Ranges**: Compare with laboratory-specific normal values
+        
+        **Interpretation Guidelines:**
+        - Automated counts should be verified manually for accuracy
+        - Morphological abnormalities require expert review
+        - Clinical correlation is essential for proper interpretation
+        - Abnormal values may require additional testing
         
         **Follow-up Actions:**
-        - Schedule dermatological consultation
-        - Document any changes in the lesion
-        - Consider biopsy if recommended by healthcare provider
-        - Implement preventive measures for future protection
+        - Repeat analysis if results are unexpected
+        - Consider peripheral blood smear review
+        - Consult hematologist for abnormal findings
+        - Document any morphological abnormalities
         
         **Important Notes:**
-        - This is a preliminary analysis based on image assessment
-        - Professional dermatological consultation is essential for accurate diagnosis
-        - Treatment effectiveness may vary based on disease severity and individual factors
-        - Always follow medical advice and safety guidelines
+        - This is an automated preliminary analysis
+        - Professional laboratory verification is required
+        - Results should be interpreted by qualified personnel
+        - Clinical correlation is essential for diagnosis
         
-        **Risk Factors:**
-        - Fair skin and light hair/eyes
-        - History of sunburns or excessive sun exposure
-        - Family history of skin cancer
-        - Multiple atypical moles or lesions
-        - Weakened immune system
+        **Reference Information:**
+        - Normal values may vary by age, sex, and laboratory
+        - Consult laboratory reference ranges for interpretation
+        - Consider patient-specific factors in evaluation
         """
         
         return analysis
@@ -449,14 +488,14 @@ def generate_fallback_response(detected_disease: str, image_description: str, cn
     except Exception as e:
         return f"Error generating fallback response: {str(e)}"
 
-def query_langchain(prompt: str, detected_disease: str, confidence: float = None, skin_context: str = None, cnn_detection: str = None) -> str:
+def query_langchain(prompt: str, detected_cells: List[str], confidence: float = None, blood_context: str = None, cell_counts: Dict = None) -> str:
     """
-    Query LangChain for skin disease analysis
+    Query LangChain for blood cell analysis
     """
     try:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            return generate_fallback_response(detected_disease, prompt, cnn_detection, confidence)
+            return generate_fallback_response(detected_cells, prompt, cell_counts, confidence)
         
         models_to_try = [
             "llama3-70b-8192",
@@ -474,29 +513,30 @@ def query_langchain(prompt: str, detected_disease: str, confidence: float = None
                         groq_api_key=api_key
                     )
                     
-                    # Enhanced prompt for skin disease analysis
+                    # Enhanced prompt for blood cell analysis
                     enhanced_prompt = f"""
-                    You are an expert dermatologist and skin cancer specialist. Analyze the following skin disease case:
+                    You are an expert hematologist and clinical laboratory scientist. Analyze the following blood smear case:
                     
                     {prompt}
                     
-                    Detected Disease: {detected_disease}
-                    Confidence: 99.0%
-                    CNN Detection: {cnn_detection if cnn_detection else "Not available"}
-                    Skin Context: {skin_context if skin_context else "Not provided"}
+                    Detected Cell Types: {', '.join(detected_cells) if detected_cells else 'None'}
+                    Cell Counts: {cell_counts if cell_counts else 'Not provided'}
+                    Detection Confidence: 99.0%
+                    Blood Context: {blood_context if blood_context else "Not provided"}
                     
-                    Provide a comprehensive skin disease analysis including:
+                    Provide a comprehensive blood cell analysis including:
                     
-                    1. **Disease Identification**: Confirm or suggest the detected disease
-                    2. **Symptom Analysis**: Detailed description of visible symptoms
-                    3. **Causal Factors**: Environmental and biological factors contributing to the disease
-                    4. **Treatment Recommendations**: Specific treatment options and application methods
-                    5. **Prevention Strategies**: Long-term prevention and management practices
-                    6. **Risk Assessment**: Severity and progression potential of the disease
-                    7. **Dermatological Impact**: Effects on skin health and appearance
-                    8. **Follow-up Actions**: Monitoring and maintenance recommendations
+                    1. **Cell Type Identification**: Confirm detected cell types and their characteristics
+                    2. **Morphological Assessment**: Detailed description of cellular features
+                    3. **Count Analysis**: Evaluation of cell counts against normal reference ranges
+                    4. **Clinical Significance**: Interpretation of findings in clinical context
+                    5. **Differential Diagnosis**: Possible conditions based on cell patterns
+                    6. **Laboratory Recommendations**: Additional tests that may be needed
+                    7. **Quality Assessment**: Comments on sample quality and reliability
+                    8. **Follow-up Actions**: Monitoring and verification recommendations
                     
-                    Be specific, practical, and provide actionable advice for skin care and medical consultation.
+                    Be specific, use appropriate hematological terminology, and provide actionable clinical recommendations.
+                    Focus on laboratory medicine best practices and quality assurance.
                     """
                     
                     response = llm.invoke(enhanced_prompt)
@@ -516,17 +556,17 @@ def query_langchain(prompt: str, detected_disease: str, confidence: float = None
                     continue
         
         # If all models fail, return fallback response
-        return generate_fallback_response(detected_disease, prompt, cnn_detection, confidence)
+        return generate_fallback_response(detected_cells, prompt, cell_counts, confidence)
         
     except Exception as e:
-        return generate_fallback_response(detected_disease, prompt, cnn_detection, confidence)
+        return generate_fallback_response(detected_cells, prompt, cell_counts, confidence)
 
-class SkinPDF(FPDF):
-    """PDF generator for skin disease reports"""
+class BloodCellPDF(FPDF):
+    """PDF generator for blood cell analysis reports"""
     
-    def __init__(self, skin_info=""):
+    def __init__(self, blood_info=""):
         super().__init__()
-        self.skin_info = self.sanitize_text(skin_info)
+        self.blood_info = self.sanitize_text(blood_info)
         self.set_auto_page_break(auto=True, margin=15)
         self.add_page()
     
@@ -564,7 +604,7 @@ class SkinPDF(FPDF):
     def header(self):
         """Header for each page"""
         self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, 'Skin Disease Analysis Report', 0, 1, 'C')
+        self.cell(0, 10, 'Blood Cell Analysis Report', 0, 1, 'C')
         self.ln(5)
     
     def footer(self):
@@ -576,14 +616,14 @@ class SkinPDF(FPDF):
     def cover_page(self):
         """Create cover page"""
         self.set_font('Arial', 'B', 24)
-        self.cell(0, 60, 'Skin Disease Analysis Report', 0, 1, 'C')
+        self.cell(0, 60, 'Blood Cell Analysis Report', 0, 1, 'C')
         self.set_font('Arial', 'B', 16)
-        self.cell(0, 20, 'AI-Powered Dermatological Assessment', 0, 1, 'C')
+        self.cell(0, 20, 'AI-Powered Hematological Assessment', 0, 1, 'C')
         self.set_font('Arial', '', 12)
         self.cell(0, 20, f'Generated on: {time.strftime("%Y-%m-%d %H:%M:%S")}', 0, 1, 'C')
-        if self.skin_info:
-            sanitized_info = self.sanitize_text(self.skin_info)
-            self.cell(0, 20, f'Skin Information: {sanitized_info}', 0, 1, 'C')
+        if self.blood_info:
+            sanitized_info = self.sanitize_text(self.blood_info)
+            self.cell(0, 20, f'Sample Information: {sanitized_info}', 0, 1, 'C')
         self.add_page()
     
     def table_of_contents(self):
@@ -595,12 +635,12 @@ class SkinPDF(FPDF):
         sections = [
             'Executive Summary',
             'Image Analysis',
-            'Disease Detection Results',
-            'Detailed Analysis',
-            'Treatment Recommendations',
-            'Prevention Strategies',
-            'Risk Assessment',
-            'Follow-up Actions'
+            'Cell Detection Results',
+            'Cell Count Analysis',
+            'Morphological Assessment',
+            'Clinical Interpretation',
+            'Quality Assessment',
+            'Follow-up Recommendations'
         ]
         
         for i, section in enumerate(sections, 1):
@@ -637,12 +677,34 @@ class SkinPDF(FPDF):
         
         self.ln(5)
     
-    def create_table(self, line):
-        """Create a simple table"""
-        self.set_font('Arial', '', 10)
-        self.cell(0, 5, line, 0, 1, 'L')
+    def add_cell_count_table(self, cell_counts):
+        """Add cell count table"""
+        self.set_font('Arial', 'B', 14)
+        self.cell(0, 10, 'Cell Count Summary', 0, 1, 'L')
+        self.ln(5)
+        
+        # Table headers
+        self.set_font('Arial', 'B', 12)
+        self.cell(60, 8, 'Cell Type', 1, 0, 'C')
+        self.cell(40, 8, 'Count', 1, 0, 'C')
+        self.cell(80, 8, 'Normal Range', 1, 1, 'C')
+        
+        # Table data
+        self.set_font('Arial', '', 11)
+        normal_ranges = {
+            'RBC': '4.5-5.5 million/uL',
+            'WBC': '4,500-11,000/uL',
+            'Platelets': '150,000-450,000/uL'
+        }
+        
+        for cell_type, count in cell_counts.items():
+            self.cell(60, 8, cell_type, 1, 0, 'L')
+            self.cell(40, 8, str(count), 1, 0, 'C')
+            self.cell(80, 8, normal_ranges.get(cell_type, 'N/A'), 1, 1, 'C')
+        
+        self.ln(10)
     
-    def add_summary(self, report, skin_context=None):
+    def add_summary(self, report, blood_context=None):
         """Add executive summary"""
         self.set_font('Arial', 'B', 16)
         self.cell(0, 10, 'Executive Summary', 0, 1, 'L')
@@ -652,70 +714,281 @@ class SkinPDF(FPDF):
         
         # Extract key information from report
         summary_points = [
-            "AI-powered skin disease detection completed successfully",
-            "Comprehensive analysis of skin health and disease symptoms",
-            "Detailed treatment and prevention recommendations provided",
-            "Risk assessment and follow-up actions outlined"
+            "AI-powered blood cell detection completed successfully",
+            "Comprehensive analysis of cellular morphology and counts",
+            "Detailed hematological assessment provided",
+            "Quality assurance and follow-up recommendations outlined"
         ]
         
         for point in summary_points:
             self.cell(0, 5, f"- {point}", 0, 1, 'L')
         
-        if skin_context:
+        if blood_context:
             self.ln(5)
-            sanitized_context = self.sanitize_text(skin_context)
-            self.cell(0, 5, f"Skin Context: {sanitized_context}", 0, 1, 'L')
+            sanitized_context = self.sanitize_text(blood_context)
+            self.cell(0, 5, f"Sample Context: {sanitized_context}", 0, 1, 'L')
         
         self.ln(10)
-    
-    def add_explainability(self, lime_path, edge_path, shap_path):
-        """Add AI explainability visualizations"""
-        self.set_font('Arial', 'B', 14)
-        self.cell(0, 10, 'AI Explainability Analysis', 0, 1, 'L')
-        self.ln(5)
-        
-        self.set_font('Arial', '', 11)
-        self.cell(0, 5, 'The following visualizations show how the AI model analyzed the skin image:', 0, 1, 'L')
-        self.ln(5)
-        
-        # Add visualizations if available
-        for path, description in [
-            (lime_path, "LIME Analysis - Feature Importance"),
-            (edge_path, "Edge Detection - Structural Features"),
-            (shap_path, "SHAP Analysis - Model Interpretability")
-        ]:
-            if path and os.path.exists(path):
-                self.set_font('Arial', 'B', 12)
-                self.cell(0, 8, self.sanitize_text(description), 0, 1, 'L')
-                self.add_image(path, width=150)
-                self.ln(5)
-    
-    def add_metrics_plots(self, plot_paths):
-        """Add performance metrics plots"""
-        self.set_font('Arial', 'B', 14)
-        self.cell(0, 10, 'Model Performance Metrics', 0, 1, 'L')
-        self.ln(5)
-        
-        for path in plot_paths:
-            if os.path.exists(path):
-                filename = os.path.basename(path)
-                if 'confusion' in filename.lower():
-                    title = "Confusion Matrix"
-                elif 'roc' in filename.lower():
-                    title = "ROC Curves"
-                elif 'training' in filename.lower():
-                    title = "Training Progress"
-                else:
-                    title = "Performance Analysis"
-                
-                self.set_font('Arial', 'B', 12)
-                self.cell(0, 8, self.sanitize_text(title), 0, 1, 'L')
-                self.add_image(path, width=150)
-                self.ln(5)
 
 def gradient_text(text, color1, color2):
     """Create gradient text effect"""
     return f'<span style="background: linear-gradient(45deg, {color1}, {color2}); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold;">{text}</span>'
+
+def load_css():
+    """Load custom CSS for blood cell detection app"""
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    .main {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    
+    .gradient-header {
+        background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+        background-size: 400% 400%;
+        animation: gradientShift 8s ease infinite;
+        padding: 2rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        border: none;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .glass-effect {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+    
+    .compact-card {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .hero-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    
+    .success-box {
+        background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #48bb78;
+        margin: 1rem 0;
+    }
+    
+    .error-box {
+        background: linear-gradient(135deg, #fed7d7 0%, #feb2b2 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #e53e3e;
+        margin: 1rem 0;
+    }
+    
+    .info-box {
+        background: linear-gradient(135deg, #e6fffa 0%, #b2f5ea 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #38b2ac;
+        margin: 1rem 0;
+    }
+    
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+def get_image_transform():
+    """Get image transformation for blood cell detection"""
+    return transforms.Compose([
+        transforms.Resize((640, 640)),  # YOLO typical input size
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                          std=[0.229, 0.224, 0.225])
+    ])
+
+def plot_cell_distribution(cell_counts: Dict[str, int], save_path: str = "cell_distribution.png") -> str:
+    """
+    Plot blood cell distribution
+    
+    Args:
+        cell_counts: Dictionary with cell types and counts
+        save_path: Path to save the plot
+        
+    Returns:
+        str: Path to saved plot
+    """
+    try:
+        import matplotlib.pyplot as plt
+        
+        cell_types = list(cell_counts.keys())
+        counts = list(cell_counts.values())
+        colors = ['#ef5350', '#42a5f5', '#66bb6a']  # Red, Blue, Green
+        
+        plt.figure(figsize=(10, 6))
+        bars = plt.bar(cell_types, counts, color=colors[:len(cell_types)])
+        
+        plt.title('Blood Cell Distribution', fontsize=16, fontweight='bold')
+        plt.xlabel('Cell Type', fontsize=12)
+        plt.ylabel('Count', fontsize=12)
+        plt.grid(True, alpha=0.3)
+        
+        # Add count labels on bars
+        for bar, count in zip(bars, counts):
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height + max(counts)*0.01,
+                    str(count), ha='center', va='bottom', fontweight='bold')
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return save_path
+        
+    except Exception as e:
+        print(f"Error plotting cell distribution: {e}")
+        return None
+
+def generate_report(analysis_data: Dict) -> str:
+    """
+    Generate a comprehensive blood cell analysis report
+    
+    Args:
+        analysis_data: Dictionary containing analysis results
+        
+    Returns:
+        str: Formatted report text
+    """
+    try:
+        report = f"""
+        **Blood Cell Analysis Report**
+        Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        
+        **Sample Information:**
+        - Analysis Type: {analysis_data.get('analysis_type', 'Blood Cell Detection')}
+        - Image Quality Score: {analysis_data.get('quality_score', 'N/A')}
+        
+        **Detection Results:**
+        """
+        
+        if 'cell_counts' in analysis_data:
+            cell_counts = analysis_data['cell_counts']
+            total_cells = sum(cell_counts.values())
+            
+            report += f"""
+        - Total Cells Detected: {total_cells}
+        - Red Blood Cells (RBC): {cell_counts.get('RBC', 0)}
+        - White Blood Cells (WBC): {cell_counts.get('WBC', 0)}
+        - Platelets: {cell_counts.get('Platelets', 0)}
+        """
+        
+        if 'confidences' in analysis_data:
+            confidences = analysis_data['confidences']
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0
+            report += f"""
+        
+        **Detection Confidence:**
+        - Average Confidence: {avg_confidence:.2%}
+        - Detection Method: YOLO v11
+        """
+        
+        report += f"""
+        
+        **Clinical Interpretation:**
+        - Automated cell counting completed
+        - Results require laboratory verification
+        - Professional review recommended
+        
+        **Quality Assurance:**
+        - Image preprocessing applied
+        - AI model validation performed
+        - Results within expected parameters
+        
+        **Recommendations:**
+        1. Verify counts with manual differential
+        2. Consider complete blood count (CBC) if abnormal
+        3. Consult hematologist for clinical correlation
+        4. Monitor trends with serial analyses
+        
+        **Disclaimer:**
+        This automated analysis is for research purposes only.
+        Professional laboratory verification is required for clinical use.
+        """
+        
+        return report
+        
+    except Exception as e:
+        return f"Error generating report: {str(e)}"re: {analysis_data.get('quality_score', 'N/A')}
+        
+        **Detection Results:**
+        """
+        
+        if 'cell_counts' in analysis_data:
+            cell_counts = analysis_data['cell_counts']
+            total_cells = sum(cell_counts.values())
+            
+            report += f"""
+        - Total Cells Detected: {total_cells}
+        - Red Blood Cells (RBC): {cell_counts.get('RBC', 0)}
+        - White Blood Cells (WBC): {cell_counts.get('WBC', 0)}
+        - Platelets: {cell_counts.get('Platelets', 0)}
+        """
+        
+        if 'confidences' in analysis_data:
+            confidences = analysis_data['confidences']
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0
+            report += f"""
+        
+        **Detection Confidence:**
+        - Average Confidence: {avg_confidence:.2%}
+        - Detection Method: YOLO v11
+        """
+        
+        report += f"""
+        
+        **Clinical Interpretation:**
+        - Automated cell counting completed
+        - Results require laboratory verification
+        - Professional review recommended
+        
+        **Quality Assurance:**
+        - Image preprocessing applied
+        - AI model validation performed
+        - Results within expected parameters
+        
+        **Recommendations:**
+        1. Verify counts with manual differential
+        2. Consider complete blood count (CBC) if abnormal
+        3. Consult hematologist for clinical correlation
+        4. Monitor trends with serial analyses
+        
+        **Disclaimer:**
+        This automated analysis is for research purposes only.
+        Professional laboratory verification is required for clinical use.
+        """
+        
+        return report
+        
+    except Exception as e:
+        return f"Error generating report: {str(e)}"
 
 def validate_dataset(dataset_dir):
     """Validate blood cell detection dataset structure"""

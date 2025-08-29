@@ -294,40 +294,54 @@ class BloodCountAnalyzerTool(BaseTool):
         except:
             return (0.0, 0.0)
 
-class RiskAssessorTool(BaseTool):
-    name: str = "risk_assessor"
-    description: str = "Assess skin health risks based on detected diseases"
+class BloodHealthRiskAssessorTool(BaseTool):
+    name: str = "blood_health_risk_assessor"
+    description: str = "Assess blood health risks based on detected cell abnormalities"
     
-    def _run(self, disease: str, skin_data: Dict) -> str:
-        """Assess skin health risks"""
+    def _run(self, cell_type: str, count_data: Dict, abnormalities: List[str] = None) -> str:
+        """Assess blood health risks based on cell analysis"""
         risk_factors = []
         
-        # Age-based risks
-        age = skin_data.get("age", "unknown")
-        if age == "elderly":
-            risk_factors.append("Age-related skin changes")
-        elif age == "young":
-            risk_factors.append("Sun damage accumulation")
+        # Cell count-based risks
+        if "count" in count_data:
+            count = count_data["count"]
+            if cell_type.lower() == "rbc":
+                if count < 4000000:  # Low RBC count
+                    risk_factors.extend(["Anemia risk", "Oxygen transport deficiency"])
+                elif count > 6000000:  # High RBC count
+                    risk_factors.extend(["Polycythemia risk", "Blood viscosity issues"])
+            elif cell_type.lower() == "wbc":
+                if count < 4000:  # Low WBC count
+                    risk_factors.extend(["Immunodeficiency risk", "Infection susceptibility"])
+                elif count > 11000:  # High WBC count
+                    risk_factors.extend(["Infection/inflammation", "Possible leukemia"])
+            elif cell_type.lower() == "platelets":
+                if count < 150000:  # Low platelet count
+                    risk_factors.extend(["Bleeding disorders", "Clotting problems"])
+                elif count > 450000:  # High platelet count
+                    risk_factors.extend(["Thrombosis risk", "Cardiovascular complications"])
         
-        # Disease-specific risks
-        disease_lower = disease.lower()
-        if "melanoma" in disease_lower:
-            risk_factors.extend(["Metastasis risk", "Life-threatening potential"])
-        elif "carcinoma" in disease_lower:
-            risk_factors.append("Local invasion risk")
-        elif "actinic" in disease_lower:
-            risk_factors.append("Pre-cancerous progression")
+        # Morphology-based risks
+        if abnormalities:
+            for abnormality in abnormalities:
+                if "sickle" in abnormality.lower():
+                    risk_factors.append("Sickle cell disease")
+                elif "spherical" in abnormality.lower():
+                    risk_factors.append("Hereditary spherocytosis")
+                elif "hypochromic" in abnormality.lower():
+                    risk_factors.append("Iron deficiency anemia")
         
-        # Environmental factors
-        if skin_data.get("sun_exposure", 0) > 70:
-            risk_factors.append("High sun exposure")
-        if skin_data.get("fair_skin", False):
-            risk_factors.append("Fair skin vulnerability")
+        risk_level = "High" if len(risk_factors) > 2 else "Moderate" if len(risk_factors) > 0 else "Low"
         
         return {
-            "risk_level": "High" if len(risk_factors) > 2 else "Moderate",
+            "risk_level": risk_level,
             "risk_factors": risk_factors,
-            "recommendations": ["Immediate dermatological consultation", "Sun protection", "Regular monitoring"]
+            "recommendations": [
+                "Complete blood count (CBC) test",
+                "Hematologist consultation if abnormal",
+                "Regular blood monitoring",
+                "Follow-up testing as recommended"
+            ]
         }
 
 class BloodCellAIAgent:
@@ -343,7 +357,7 @@ class BloodCellAIAgent:
             BloodCellAnalysisTool(),
             CellMorphologyTool(),
             BloodCountAnalyzerTool(),
-            RiskAssessorTool()
+            BloodHealthRiskAssessorTool()
         ]
         
         # Initialize agent
@@ -452,8 +466,8 @@ class BloodCellAIAgent:
         **Note:** This is an automated preliminary analysis. Professional laboratory verification is required.
         """
 
-class ResearchAssistantAgent:
-    """Research Assistant for Dermatology Literature"""
+class HematologyResearchAgent:
+    """Research Assistant for Hematology Literature"""
     
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -497,16 +511,17 @@ class ResearchAssistantAgent:
         # If all models fail, raise an exception
         raise Exception("All GROQ models are currently unavailable")
     
-    def search_dermatology_literature(self, disease: str) -> str:
-        """Search dermatology literature for disease"""
+    def search_hematology_literature(self, condition: str) -> str:
+        """Search hematology literature for blood conditions"""
         prompt = f"""
-        Provide recent dermatology research findings about: {disease}
+        Provide recent hematology research findings about: {condition}
         
         Include:
-        1. Latest treatment approaches
-        2. Prevention strategies
-        3. Risk factors
+        1. Latest diagnostic approaches
+        2. Treatment protocols
+        3. Risk factors and complications
         4. Management practices
+        5. Laboratory reference ranges
         """
         
         try:
@@ -515,43 +530,56 @@ class ResearchAssistantAgent:
         except Exception as e:
             return f"Unable to search literature: {str(e)}"
 
-class DataAnalysisAgent:
-    """Data Analysis Agent for Skin Health Trends"""
+class BloodDataAnalysisAgent:
+    """Data Analysis Agent for Blood Health Trends"""
     
     def __init__(self):
         self.analysis_history = []
     
-    def analyze_skin_health_trends(self, skin_history: List[Dict]) -> Dict:
-        """Analyze skin health trends from history"""
-        if not skin_history:
-            return {"message": "No skin history available"}
+    def analyze_blood_health_trends(self, blood_history: List[Dict]) -> Dict:
+        """Analyze blood health trends from history"""
+        if not blood_history:
+            return {"message": "No blood analysis history available"}
         
         # Analyze trends
-        diseases = [entry.get("disease") for entry in skin_history]
-        confidences = [entry.get("confidence", 0) for entry in skin_history]
+        cell_types = [entry.get("cell_type") for entry in blood_history]
+        counts = [entry.get("count", 0) for entry in blood_history]
+        confidences = [entry.get("confidence", 0) for entry in blood_history]
         
         trend_analysis = {
-            "total_analyses": len(skin_history),
-            "most_common_disease": max(set(diseases), key=diseases.count) if diseases else None,
+            "total_analyses": len(blood_history),
+            "most_analyzed_cell": max(set(cell_types), key=cell_types.count) if cell_types else None,
             "average_confidence": sum(confidences) / len(confidences) if confidences else 0,
-            "trend_direction": "Improving" if len(confidences) > 1 and confidences[-1] > confidences[0] else "Stable",
-            "recommendations": self._generate_trend_recommendations(diseases, confidences)
+            "count_trend": "Increasing" if len(counts) > 1 and counts[-1] > counts[0] else "Stable",
+            "recommendations": self._generate_blood_trend_recommendations(cell_types, counts, confidences)
         }
         
         return trend_analysis
     
-    def _generate_trend_recommendations(self, diseases: List[str], confidences: List[float]) -> List[str]:
-        """Generate recommendations based on trends"""
+    def _generate_blood_trend_recommendations(self, cell_types: List[str], counts: List[float], confidences: List[float]) -> List[str]:
+        """Generate recommendations based on blood analysis trends"""
         recommendations = []
         
-        if len(diseases) > 1:
-            if diseases[-1] == diseases[-2]:
-                recommendations.append("Persistent skin condition detected - consider dermatological consultation")
+        if len(cell_types) > 1:
+            if cell_types[-1] == cell_types[-2]:
+                recommendations.append("Consistent cell type analysis - consider comprehensive blood panel")
             
             if confidences[-1] < 0.7:
-                recommendations.append("Low confidence in recent analysis - recommend retesting")
+                recommendations.append("Low confidence in recent analysis - recommend manual verification")
         
-        recommendations.append("Continue monitoring and regular skin care")
+        # Check for concerning trends
+        if len(counts) > 1:
+            if counts[-1] < counts[0] * 0.8:  # 20% decrease
+                recommendations.append("Declining cell count trend - consult hematologist")
+            elif counts[-1] > counts[0] * 1.2:  # 20% increase
+                recommendations.append("Increasing cell count trend - monitor closely")
+        
+        recommendations.extend([
+            "Continue regular blood monitoring",
+            "Maintain detailed health records",
+            "Follow up with healthcare provider as recommended"
+        ])
+        
         return recommendations
 
 # Utility functions
@@ -560,9 +588,9 @@ def create_agent_instance(agent_type: str, api_key: str):
     if agent_type == "blood":
         return BloodCellAIAgent(api_key)
     elif agent_type == "research":
-        return ResearchAssistantAgent(api_key)
+        return HematologyResearchAgent(api_key)
     elif agent_type == "data":
-        return DataAnalysisAgent()
+        return BloodDataAnalysisAgent()
     else:
         raise ValueError(f"Unknown agent type: {agent_type}")
 
