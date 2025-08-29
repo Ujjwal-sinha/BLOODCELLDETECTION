@@ -1129,3 +1129,137 @@ def create_evaluation_plots(detection_results: Dict[str, any],
     except Exception as e:
         print(f"Error creating evaluation dashboard: {e}")
         return {}
+def analyze_blood_metrics(detection_results: dict) -> dict:
+    """
+    Analyze blood cell metrics and ratios from detection results
+    
+    Args:
+        detection_results: Dictionary containing detection counts and confidence scores
+        
+    Returns:
+        dict: Analysis results including ratios and flags for abnormal values
+    """
+    try:
+        stats = detection_results['stats']
+        rbc_count = stats['RBC_count']
+        wbc_count = stats['WBC_count']
+        platelet_count = stats['Platelet_count']
+        
+        # Calculate ratios
+        wbc_rbc_ratio = wbc_count / rbc_count if rbc_count > 0 else 0
+        platelet_rbc_ratio = platelet_count / rbc_count if rbc_count > 0 else 0
+        
+        # Normal ranges (approximate values, should be adjusted based on specific requirements)
+        normal_ranges = {
+            'WBC_RBC_ratio': (0.001, 0.01),  # Typical WBC:RBC ratio range
+            'Platelet_RBC_ratio': (0.02, 0.2),  # Typical Platelet:RBC ratio range
+        }
+        
+        # Check for abnormalities
+        analysis = {
+            'ratios': {
+                'WBC_RBC_ratio': wbc_rbc_ratio,
+                'Platelet_RBC_ratio': platelet_rbc_ratio
+            },
+            'flags': {
+                'low_RBC': rbc_count < 10,  # Arbitrary threshold, adjust as needed
+                'high_WBC': wbc_rbc_ratio > normal_ranges['WBC_RBC_ratio'][1],
+                'low_WBC': wbc_rbc_ratio < normal_ranges['WBC_RBC_ratio'][0],
+                'high_platelets': platelet_rbc_ratio > normal_ranges['Platelet_RBC_ratio'][1],
+                'low_platelets': platelet_rbc_ratio < normal_ranges['Platelet_RBC_ratio'][0]
+            },
+            'interpretation': []
+        }
+        
+        # Generate interpretation
+        if analysis['flags']['low_RBC']:
+            analysis['interpretation'].append("Low RBC count detected - possible anemia")
+        if analysis['flags']['high_WBC']:
+            analysis['interpretation'].append("Elevated WBC count - possible infection or inflammation")
+        if analysis['flags']['low_WBC']:
+            analysis['interpretation'].append("Low WBC count - possible immunodeficiency")
+        if analysis['flags']['high_platelets']:
+            analysis['interpretation'].append("Elevated platelet count - possible thrombocytosis")
+        if analysis['flags']['low_platelets']:
+            analysis['interpretation'].append("Low platelet count - possible thrombocytopenia")
+            
+        if not analysis['interpretation']:
+            analysis['interpretation'].append("All cell counts appear to be within normal ranges")
+            
+        return analysis
+        
+    except Exception as e:
+        print(f"Error analyzing blood metrics: {e}")
+        return {
+            'ratios': {},
+            'flags': {},
+            'interpretation': ["Error analyzing blood cell metrics"]
+        }
+
+def create_evaluation_plots(detection_results: Dict[str, any],
+                      save_dir: str = './plots') -> Dict[str, str]:
+    """
+    Create evaluation plots for blood cell detection
+    
+    Args:
+        detection_results: Detection results from model
+        save_dir: Directory to save plots
+        
+    Returns:
+        dict: Paths to saved plot files
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    plot_paths = {}
+    
+    try:
+        stats = detection_results['stats']
+        detections = detection_results['detections']
+        
+        # Cell count distribution
+        plt.figure(figsize=(10, 6))
+        cell_types = ['RBC', 'WBC', 'Platelets']
+        counts = [len(detections[cell_type]) for cell_type in cell_types]
+        colors = ['#ef5350', '#42a5f5', '#66bb6a']
+        
+        plt.bar(cell_types, counts, color=colors)
+        plt.title('Blood Cell Distribution', fontsize=14)
+        plt.ylabel('Count')
+        plt.grid(True, alpha=0.3)
+        
+        for i, count in enumerate(counts):
+            plt.text(i, count, str(count), 
+                    horizontalalignment='center',
+                    verticalalignment='bottom')
+        
+        count_path = os.path.join(save_dir, 'cell_distribution.png')
+        plt.savefig(count_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        plot_paths['distribution'] = count_path
+        
+        # Confidence distribution
+        plt.figure(figsize=(10, 6))
+        conf_data = []
+        labels = []
+        
+        for cell_type in cell_types:
+            confidences = [det['confidence'] for det in detections[cell_type]]
+            if confidences:
+                conf_data.append(confidences)
+                labels.extend([cell_type] * len(confidences))
+        
+        if conf_data:
+            plt.boxplot(conf_data, labels=cell_types)
+            plt.title('Detection Confidence Distribution', fontsize=14)
+            plt.ylabel('Confidence Score')
+            plt.grid(True, alpha=0.3)
+            
+            conf_path = os.path.join(save_dir, 'confidence_distribution.png')
+            plt.savefig(conf_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            plot_paths['confidence'] = conf_path
+        
+        return plot_paths
+        
+    except Exception as e:
+        print(f"Error creating evaluation plots: {e}")
+        return {}
