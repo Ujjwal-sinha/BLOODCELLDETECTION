@@ -242,6 +242,48 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
+agents.py - Updated with blood cell-specific AI agents:
+
+BloodCellAnalysisTool - Analyzes blood cell images
+CellMorphologyTool - Analyzes cell shape and characteristics
+BloodCountAnalyzerTool - Analyzes cell counts and distributions
+BloodHealthRiskAssessorTool - Assesses health risks
+HematologyResearchAgent - Research assistant for blood conditions
+BloodDataAnalysisAgent - Trend analysis for blood health
+app.py - Complete Streamlit application:
+
+Blood cell detection interface
+YOLO model integration
+AI-powered analysis
+Professional reporting
+Advanced visualizations
+PDF report generation
+utils.py - Comprehensive utility functions:
+
+Blood cell image processing
+LIME, SHAP, Grad-CAM visualizations
+Quality assessment
+Report generation
+Dataset validation
+models.py - Advanced ML models:
+
+YOLO blood cell detection
+CNN classification models
+Training and evaluation functions
+Performance metrics
+Blood cell analysis
+🩸 Blood Cell Types Supported:
+RBC (Red Blood Cells) - Oxygen transport
+WBC (White Blood Cells) - Immune defense
+Platelets - Blood clotting
+🚀 Key Features:
+Real-time Detection using YOLOv11
+AI-Powered Analysis with LangChain agents
+Professional Reports in PDF format
+Advanced Visualizations (LIME, SHAP, Grad-CAM)
+Clinical Insights with normal range comparisons
+Quality Assessment of blood smear images
+
 **⚠️ Disclaimer**: This tool is for research and educational purposes only. Not intended for clinical diagnosis. Always consult qualified medical professionals for health-related decisions.
 
 **🩸 BloodCellAI** - Advancing hematological analysis through artificial intelligence.
