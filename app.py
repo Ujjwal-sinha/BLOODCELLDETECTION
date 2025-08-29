@@ -115,18 +115,20 @@ else:
     st.error(f"Dataset directory '{dataset_dir}' not found")
     st.stop()
 
-# Filter to only include classes with images
-valid_classes = []
-for class_name in classes:
-    class_path = os.path.join(dataset_dir, class_name)
-    images = [f for f in os.listdir(class_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    if len(images) > 0:
-        valid_classes.append(class_name)
+# For YOLO dataset, validate images exist
+has_images = False
+total_images = 0
 
-classes = valid_classes
+for split in ['train', 'valid', 'test']:
+    images_path = os.path.join(dataset_dir, split, 'images')
+    if os.path.exists(images_path):
+        images = [f for f in os.listdir(images_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        total_images += len(images)
+        if len(images) > 0:
+            has_images = True
 
-if not classes:
-    st.error("No valid classes found in dataset")
+if not has_images:
+    st.error("No images found in the dataset")
     st.stop()
 
 st.success(f"✅ Dataset validated: Found {len(classes)} classes")
@@ -135,8 +137,8 @@ st.success(f"✅ Dataset validated: Found {len(classes)} classes")
 with st.sidebar:
     st.markdown("""
     <div class="glass-effect">
-        <h3 style="color: #2d3748; font-weight: 600;">🩺 About SkinDiseaseAI</h3>
-        <p style="color: #4a5568; font-weight: 500;">Advanced AI-Powered Skin Disease Detection Platform combines:</p>
+        <h3 style="color: #2d3748; font-weight: 600;">🔬 About Blood Cell Detection</h3>
+        <p style="color: #4a5568; font-weight: 500;">Advanced AI-Powered Blood Cell Detection Platform combines:</p>
         <ul style="color: #4a5568; font-weight: 500;">
             <li>🔍 Advanced computer vision</li>
             <li>🩺 Dermatological expertise</li>
