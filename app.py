@@ -460,7 +460,8 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                     
                     # Run comprehensive cell detection to find ALL cells
                     print("Starting comprehensive cell detection...")
-                    detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.1)
+                    st.info("🔍 Running comprehensive blood cell detection with maximum sensitivity...")
+                    detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.01)
                     
                     # Clean up temp file
                     os.unlink(tmp_file.name)
@@ -485,14 +486,25 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                         - **Detection Density:** {stats['detection_density']:.6f} cells/pixel
                         """)
                         
-                        # Create and display visualization of all detected cells
+                                        # Create and display visualization of all detected cells
                         with st.spinner("Creating comprehensive cell visualization..."):
-                            viz_path = visualize_all_cells(tmp_file.name, detection_results)
-                            if viz_path and os.path.exists(viz_path):
-                                st.image(viz_path, caption="All Detected Cells - Comprehensive View", use_column_width=True)
-                                st.success("✅ All cells visualized successfully!")
-                            else:
-                                st.warning("⚠️ Could not create cell visualization")
+                            try:
+                                # Save the current image temporarily for visualization
+                                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as viz_tmp_file:
+                                    image.save(viz_tmp_file.name)
+                                    viz_path = visualize_all_cells(viz_tmp_file.name, detection_results)
+                                    
+                                    if viz_path and os.path.exists(viz_path):
+                                        st.image(viz_path, caption=f"All Detected Cells - {total_detected} cells found", use_column_width=True)
+                                        st.success("✅ All cells visualized successfully!")
+                                    else:
+                                        st.warning("⚠️ Could not create cell visualization")
+                                    
+                                    # Clean up temp file
+                                    os.unlink(viz_tmp_file.name)
+                            except Exception as viz_error:
+                                st.warning(f"⚠️ Visualization error: {str(viz_error)}")
+                                st.info("Detection completed successfully, but visualization failed")
                     else:
                         st.warning("⚠️ No cells detected in the image")
                     
