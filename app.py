@@ -514,9 +514,13 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                     count_data = {}
                     
                     for cell_type in ['RBC', 'WBC', 'Platelets']:
-                        count = stats[f'{cell_type}_count']
+                        if cell_type == 'Platelets':
+                            count = stats['Platelet_count']  # Use singular form for count
+                        else:
+                            count = stats[f'{cell_type}_count']
                         if count > 0:
                             detected_cells.append(cell_type)
+                            # confidence_scores uses plural form for all keys
                             confidences.append(stats['confidence_scores'][cell_type])
                             count_data[cell_type] = count
                     
