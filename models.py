@@ -1302,65 +1302,6 @@ def analyze_blood_metrics(detection_results: dict) -> dict:
             'flags': {},
             'interpretation': ["Error analyzing blood cell metrics"]
         }
-    plot_paths = []
-    
-    try:
-        # Training curves
-        if train_losses and val_losses:
-            plt.figure(figsize=(15, 5))
-            
-            plt.subplot(1, 2, 1)
-            plt.plot(train_losses, label='Training Loss', color='blue')
-            plt.plot(val_losses, label='Validation Loss', color='red')
-            plt.title('Skin Disease Detection - Training Loss')
-            plt.xlabel('Epoch')
-            plt.ylabel('Loss')
-            plt.legend()
-            plt.grid(True)
-            
-            plt.subplot(1, 2, 2)
-            plt.plot(train_accuracies, label='Training Accuracy', color='blue')
-            plt.plot(val_accuracies, label='Validation Accuracy', color='red')
-            plt.title('Skin Disease Detection - Training Accuracy')
-            plt.xlabel('Epoch')
-            plt.ylabel('Accuracy (%)')
-            plt.legend()
-            plt.grid(True)
-            
-            plt.tight_layout()
-            training_plot_path = "skin_training_curves.png"
-            plt.savefig(training_plot_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            plot_paths.append(training_plot_path)
-        
-        # Performance summary
-        if all_labels and all_predictions and classes:
-            plt.figure(figsize=(12, 8))
-            
-            # Confusion matrix
-            cm = confusion_matrix(all_labels, all_predictions)
-            plt.subplot(2, 2, 1)
-            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                       xticklabels=classes, yticklabels=classes)
-            plt.title('Confusion Matrix')
-            plt.ylabel('True Label')
-            plt.xlabel('Predicted Label')
-            
-            # Class accuracy
-            class_acc = cm.diagonal() / cm.sum(axis=1)
-            plt.subplot(2, 2, 2)
-            plt.bar(range(len(classes)), class_acc)
-            plt.title('Class-wise Accuracy')
-            plt.xlabel('Class')
-            plt.ylabel('Accuracy')
-            plt.xticks(range(len(classes)), classes, rotation=45)
-            
-            # ROC curves for multi-class
-            if len(classes) > 2:
-                plt.subplot(2, 2, 3)
-                for i, class_name in enumerate(classes):
-                    y_true_binary = [1 if label == i else 0 for label in y_true]
-                    y_score_binary = [score[i] for score in y_score]
                     
 def analyze_blood_metrics(detection_results: dict) -> dict:
     """
@@ -1428,29 +1369,6 @@ def analyze_blood_metrics(detection_results: dict) -> dict:
             'flags': {},
             'interpretation': ["Error analyzing blood cell metrics"]
         }
-            fpr, tpr, _ = roc_curve(y_true_binary, y_score_binary)
-            roc_auc = auc(fpr, tpr)
-            plt.plot(fpr, tpr, label=f'{class_name} (AUC = {roc_auc:.2f})')
-            
-            plt.plot([0, 1], [0, 1], 'k--')
-            plt.xlim([0.0, 1.0])
-            plt.ylim([0.0, 1.05])
-            plt.xlabel('False Positive Rate')
-            plt.ylabel('True Positive Rate')
-            plt.title('ROC Curves')
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-            
-            plt.tight_layout()
-            performance_plot_path = "skin_performance_summary.png"
-            plt.savefig(performance_plot_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            plot_paths.append(performance_plot_path)
-        
-        return plot_paths
-        
-    except Exception as e:
-        print(f"Error plotting metrics: {e}")
-        return []
 
 def create_evaluation_plots(detection_results: Dict[str, any],
                       save_dir: str = './plots') -> Dict[str, str]:
