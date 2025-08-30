@@ -25,7 +25,7 @@ import numpy as np
 from models import (
     device, clear_mps_cache, load_yolo_model, preprocess_image,
     plot_metrics, plot_detection_results, detect_all_cells_comprehensive,
-    visualize_all_cells, generate_comprehensive_explainability,
+    visualize_all_cells, generate_automatic_explainability,
     generate_lime_explanation, generate_shap_explanation, generate_gradcam_explanation,
     LIME_AVAILABLE, SHAP_AVAILABLE, GRADCAM_AVAILABLE
 )
@@ -508,136 +508,95 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                                 st.warning(f"⚠️ Visualization error: {str(viz_error)}")
                                 st.info("Detection completed successfully, but visualization failed")
                         
-                        # 🔬 EXPLAINABILITY ANALYSIS SECTION
+                        # 🔬 AUTOMATIC EXPLAINABILITY ANALYSIS SECTION
                         st.markdown("---")
-                        st.markdown("## 🔬 AI Explainability Analysis")
-                        st.markdown("**Understanding WHY the AI detected cells in specific regions**")
+                        st.markdown("## 🔬 Automatic AI Explainability Analysis")
+                        st.markdown("**Automatically generated insights showing WHY the AI detected cells**")
                         
-                        # Check availability of explainability methods
-                        available_methods = []
-                        if LIME_AVAILABLE:
-                            available_methods.append("LIME")
-                        if SHAP_AVAILABLE:
-                            available_methods.append("SHAP")
-                        if GRADCAM_AVAILABLE:
-                            available_methods.append("Grad-CAM")
+                        # Check if explainability results were generated automatically
+                        explainability_results = detection_results.get('explainability', {})
                         
-                        if available_methods:
-                            st.info(f"✅ Available explainability methods: {', '.join(available_methods)}")
+                        if explainability_results:
+                            st.success("✅ Explainability analysis automatically generated!")
                             
-                            # Explainability options
-                            col1, col2, col3 = st.columns(3)
+                            # Display each explanation automatically
+                            for method, path in explainability_results.items():
+                                if method != 'summary' and os.path.exists(path):
+                                    method_names = {
+                                        'edge_detection': '🔍 Edge Detection Analysis',
+                                        'lime': '📊 LIME Explanation',
+                                        'shap': '🎯 SHAP Explanation',
+                                        'gradcam': '🎨 Grad-CAM Explanation',
+                                        'heatmap': '🌡️ Detection Confidence Heatmap'
+                                    }
+                                    
+                                    method_name = method_names.get(method, method.replace('_', ' ').title())
+                                    
+                                    st.markdown(f"### {method_name}")
+                                    st.image(path, caption=f"{method_name} - Automatically generated explanation", 
+                                           use_column_width=True)
+                            
+                            # Display comprehensive summary if available
+                            if 'summary' in explainability_results and os.path.exists(explainability_results['summary']):
+                                st.markdown("### 📋 Comprehensive Explainability Summary")
+                                st.image(explainability_results['summary'], 
+                                       caption="Complete explainability analysis summary", 
+                                       use_column_width=True)
+                            
+                            # Add interpretation guide
+                            st.markdown("### 🎯 How to Interpret These Results")
+                            
+                            col1, col2 = st.columns(2)
                             
                             with col1:
-                                run_lime = st.checkbox("🔍 LIME Analysis", 
-                                                     value=LIME_AVAILABLE,
-                                                     disabled=not LIME_AVAILABLE,
-                                                     help="Local Interpretable Model-agnostic Explanations")
+                                st.markdown("""
+                                **🔍 Edge Detection Analysis:**
+                                - Shows cell boundaries and structural features
+                                - Helps identify cell shapes and sizes
+                                - White areas = detected edges/boundaries
+                                
+                                **🌡️ Detection Heatmap:**
+                                - Red/yellow = high confidence detections
+                                - Blue/dark = low confidence areas
+                                - Shows where AI is most certain about cells
+                                """)
                             
                             with col2:
-                                run_shap = st.checkbox("📊 SHAP Analysis", 
-                                                     value=SHAP_AVAILABLE,
-                                                     disabled=not SHAP_AVAILABLE,
-                                                     help="SHapley Additive exPlanations")
+                                st.markdown("""
+                                **📊 LIME/SHAP (if available):**
+                                - Green/red regions = important for detection
+                                - Shows which image areas influenced AI decision
+                                - Helps validate AI reasoning process
+                                
+                                **🎨 Grad-CAM (if available):**
+                                - Warm colors = high attention areas
+                                - Shows where AI "looks" during detection
+                                - Reveals model focus patterns
+                                """)
                             
-                            with col3:
-                                run_gradcam = st.checkbox("🎯 Grad-CAM Analysis", 
-                                                        value=GRADCAM_AVAILABLE,
-                                                        disabled=not GRADCAM_AVAILABLE,
-                                                        help="Gradient-weighted Class Activation Mapping")
-                            
-                            # Run explainability analysis
-                            if st.button("🚀 Generate Explainability Analysis", type="primary"):
-                                with st.spinner("🔬 Generating comprehensive explainability analysis..."):
-                                    try:
-                                        # Save current image for explainability
-                                        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as exp_tmp_file:
-                                            image.save(exp_tmp_file.name)
-                                            
-                                            # Create explainability results directory
-                                            exp_dir = tempfile.mkdtemp(prefix="explainability_")
-                                            
-                                            explainability_results = {}
-                                            
-                                            # Generate selected explanations
-                                            if run_lime and LIME_AVAILABLE:
-                                                st.info("🔍 Generating LIME explanation...")
-                                                lime_path = generate_lime_explanation(exp_tmp_file.name, yolo_model, 
-                                                                                    os.path.join(exp_dir, "lime.png"))
-                                                if lime_path:
-                                                    explainability_results['lime'] = lime_path
-                                            
-                                            if run_shap and SHAP_AVAILABLE:
-                                                st.info("📊 Generating SHAP explanation...")
-                                                shap_path = generate_shap_explanation(exp_tmp_file.name, yolo_model,
-                                                                                    os.path.join(exp_dir, "shap.png"))
-                                                if shap_path:
-                                                    explainability_results['shap'] = shap_path
-                                            
-                                            if run_gradcam and GRADCAM_AVAILABLE:
-                                                st.info("🎯 Generating Grad-CAM explanation...")
-                                                gradcam_path = generate_gradcam_explanation(exp_tmp_file.name, yolo_model,
-                                                                                          os.path.join(exp_dir, "gradcam.png"))
-                                                if gradcam_path:
-                                                    explainability_results['gradcam'] = gradcam_path
-                                            
-                                            # Display results
-                                            if explainability_results:
-                                                st.success("✅ Explainability analysis completed!")
-                                                
-                                                # Display each explanation
-                                                for method, path in explainability_results.items():
-                                                    if os.path.exists(path):
-                                                        method_name = {
-                                                            'lime': '🔍 LIME Explanation',
-                                                            'shap': '📊 SHAP Explanation', 
-                                                            'gradcam': '🎯 Grad-CAM Explanation'
-                                                        }.get(method, method.upper())
-                                                        
-                                                        st.markdown(f"### {method_name}")
-                                                        st.image(path, caption=f"{method_name} - Shows important regions for cell detection", 
-                                                               use_column_width=True)
-                                                
-                                                # Create comprehensive summary
-                                                st.markdown("### 📋 Explainability Summary")
-                                                st.markdown("""
-                                                **Understanding the AI's Decision Process:**
-                                                
-                                                🔍 **LIME (Local Interpretable Model-agnostic Explanations):**
-                                                - Highlights image regions that most influence the detection decision
-                                                - Green areas contribute positively to cell detection
-                                                - Red areas may inhibit detection
-                                                
-                                                📊 **SHAP (SHapley Additive exPlanations):**
-                                                - Provides pixel-level feature attribution
-                                                - Red regions increase detection confidence
-                                                - Blue regions decrease detection confidence
-                                                
-                                                🎯 **Grad-CAM (Gradient-weighted Class Activation Mapping):**
-                                                - Shows where the model focuses its attention
-                                                - Heatmap indicates regions of highest importance
-                                                - Warmer colors = higher attention/relevance
-                                                
-                                                **Clinical Significance:**
-                                                These explainability methods help medical professionals understand WHY the AI 
-                                                made specific detection decisions, increasing trust and enabling better 
-                                                clinical interpretation of automated results.
-                                                """)
-                                            else:
-                                                st.warning("⚠️ No explainability results generated. Please check method availability.")
-                                            
-                                            # Clean up temp file
-                                            os.unlink(exp_tmp_file.name)
-                                            
-                                    except Exception as exp_error:
-                                        st.error(f"❌ Explainability analysis failed: {str(exp_error)}")
-                                        st.info("Detection results are still valid, but explainability analysis encountered an error.")
-                        else:
-                            st.warning("⚠️ No explainability methods available. Install required packages:")
-                            st.code("""
-pip install lime shap grad-cam
+                            st.info("""
+                            **Clinical Significance:** These automatically generated explanations help medical 
+                            professionals understand and validate the AI's detection decisions, building trust 
+                            in automated blood cell analysis results.
                             """)
-                            st.info("Explainability analysis requires additional packages for LIME, SHAP, and Grad-CAM visualization.")
+                            
+                        else:
+                            st.info("🔄 Explainability analysis will be generated automatically with detection results.")
+                            
+                            # Show what would be available
+                            available_methods = ["Edge Detection", "Detection Heatmap"]
+                            if LIME_AVAILABLE:
+                                available_methods.append("LIME")
+                            if SHAP_AVAILABLE:
+                                available_methods.append("SHAP")
+                            if GRADCAM_AVAILABLE:
+                                available_methods.append("Grad-CAM")
+                            
+                            st.markdown(f"**Available methods:** {', '.join(available_methods)}")
+                            
+                            if not any([LIME_AVAILABLE, SHAP_AVAILABLE, GRADCAM_AVAILABLE]):
+                                st.warning("⚠️ Install additional packages for more explainability methods:")
+                                st.code("pip install lime shap grad-cam pytorch-grad-cam")
                     
                     else:
                         st.warning("⚠️ No cells detected in the image")
