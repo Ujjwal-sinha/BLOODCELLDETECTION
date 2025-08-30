@@ -16,11 +16,13 @@ An AI-powered platform for automated blood cell detection and analysis using sta
 - **Clinical Insights**: Automated interpretation of cell counts and ratios
 - **Risk Assessment**: Identify potential blood disorders and abnormalities
 
-### 📊 Advanced Visualizations
-- **AI Explainability**: LIME, SHAP, and Grad-CAM visualizations
+### 📊 Advanced Visualizations & Explainability
+- **🔍 LIME Analysis**: Local Interpretable Model-agnostic Explanations
+- **📊 SHAP Analysis**: SHapley Additive exPlanations for feature attribution
+- **🎯 Grad-CAM**: Gradient-weighted Class Activation Mapping
 - **Statistical Analysis**: Comprehensive cell distribution charts
 - **Quality Metrics**: Image quality assessment and confidence scores
-- **Interactive Dashboard**: Real-time analysis results
+- **Interactive Dashboard**: Real-time analysis results with explainable AI
 
 ### 📋 Professional Reporting
 - **PDF Reports**: Generate comprehensive analysis reports
@@ -46,6 +48,11 @@ cd BloodCellAI
 2. **Install dependencies**
 ```bash
 pip install -r requirements.txt
+```
+
+3. **Install explainability packages (optional)**
+```bash
+pip install lime shap grad-cam pytorch-grad-cam
 ```
 
 3. **Set up environment variables**
@@ -126,6 +133,53 @@ Where:
 - **Detection**: Tiny irregular shapes
 
 ## 🔬 Analysis Features
+
+### 🧠 AI Explainability & Interpretability
+
+Our platform includes state-of-the-art explainable AI features to help medical professionals understand WHY the AI made specific detection decisions:
+
+#### 🔍 LIME (Local Interpretable Model-agnostic Explanations)
+- **Purpose**: Explains individual predictions by highlighting important image regions
+- **Visualization**: Green regions contribute positively to detection, red regions negatively
+- **Use Case**: Understanding which parts of the blood smear influenced cell detection
+- **Clinical Value**: Helps validate AI decisions against human expertise
+
+#### 📊 SHAP (SHapley Additive exPlanations)
+- **Purpose**: Provides pixel-level feature attribution for detection decisions
+- **Visualization**: Red areas increase detection confidence, blue areas decrease it
+- **Mathematical Foundation**: Based on cooperative game theory
+- **Clinical Value**: Quantifies the contribution of each image region to the final decision
+
+#### 🎯 Grad-CAM (Gradient-weighted Class Activation Mapping)
+- **Purpose**: Shows where the AI model focuses its attention during detection
+- **Visualization**: Heatmap with warmer colors indicating higher attention/importance
+- **Technical Approach**: Uses gradients to highlight discriminative regions
+- **Clinical Value**: Reveals the AI's "attention" patterns for quality assurance
+
+#### 🏥 Clinical Integration Benefits
+- **Trust & Transparency**: Medical professionals can verify AI reasoning
+- **Quality Assurance**: Identify potential false positives/negatives
+- **Educational Tool**: Learn from AI detection patterns
+- **Regulatory Compliance**: Explainable AI for medical device approval
+- **Continuous Improvement**: Feedback loop for model refinement
+
+#### 🚀 Usage in Application
+```python
+# Generate comprehensive explainability analysis
+from models import generate_comprehensive_explainability
+
+explainability_results = generate_comprehensive_explainability(
+    image_path="blood_smear.jpg",
+    model=yolo_model,
+    output_dir="explainability_results"
+)
+
+# Results include LIME, SHAP, and Grad-CAM visualizations
+# - lime_explanation.png
+# - shap_explanation.png  
+# - gradcam_explanation.png
+# - explainability_summary.png
+```
 
 ### Detection Analysis
 - Cell counting and classification

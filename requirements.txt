@@ -21,6 +21,8 @@ langchain-groq>=0.1.0
 # Explainability (optional)
 lime>=0.2.0
 shap>=0.42.0
+grad-cam>=1.4.0
+pytorch-grad-cam>=1.4.0
 
 # Report generation
 fpdf2>=2.7.0
