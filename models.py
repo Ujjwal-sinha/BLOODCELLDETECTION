@@ -81,6 +81,152 @@ def load_yolo_model(weights_path='yolo11n.pt'):
         print(f"Error loading YOLO model: {e}")
         return None
 
+def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.1):
+    """
+    Comprehensive detection of ALL cells in the image with maximum sensitivity
+    
+    Args:
+        model: YOLO model instance
+        image_path: Path to the blood smear image
+        confidence_threshold: Very low threshold to detect maximum cells
+        
+    Returns:
+        Dictionary containing comprehensive cell detection results
+    """
+    try:
+        if model is None:
+            print("❌ YOLO model is not available")
+            return None
+            
+        print(f"🔍 Starting comprehensive cell detection...")
+        print(f"📊 Using confidence threshold: {confidence_threshold}")
+        
+        # Store original model settings
+        original_conf = getattr(model, 'conf', 0.25)
+        original_iou = getattr(model, 'iou', 0.45)
+        
+        # Configure for maximum detection sensitivity
+        model.conf = confidence_threshold  # Very low confidence threshold
+        model.iou = 0.2   # Lower IoU for more overlapping detections
+        
+        # Run inference with maximum detection settings
+        print("🚀 Running YOLO inference...")
+        results = model(image_path, save=False, verbose=False, imgsz=640)
+        
+        # Restore original settings
+        model.conf = original_conf
+        model.iou = original_iou
+        
+        # Initialize comprehensive detection storage
+        all_detections = {
+            'RBC': [],
+            'WBC': [],
+            'Platelets': [],
+            'All_Cells': []  # Master list of all detected cells
+        }
+        
+        total_cells_detected = 0
+        detection_areas = []
+        
+        # Process all detection results
+        for r in results:
+            if hasattr(r, 'boxes') and r.boxes is not None:
+                boxes = r.boxes
+                print(f"📦 Processing {len(boxes)} detected objects...")
+                
+                for box in boxes:
+                    # Extract box information
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    conf = box.conf[0].item()
+                    cls = int(box.cls[0].item())
+                    
+                    # Calculate cell area
+                    cell_area = (x2 - x1) * (y2 - y1)
+                    detection_areas.append(cell_area)
+                    
+                    # Map class index to cell type
+                    class_names = ['RBC', 'WBC', 'Platelets']
+                    if hasattr(model, 'names') and model.names:
+                        class_names = list(model.names.values())
+                    
+                    if cls < len(class_names):
+                        cell_type = class_names[cls]
+                        
+                        # Create comprehensive cell data
+                        cell_data = {
+                            'bbox': [x1, y1, x2, y2],
+                            'confidence': conf,
+                            'cell_type': cell_type,
+                            'area': cell_area,
+                            'center': [(x1 + x2) / 2, (y1 + y2) / 2],
+                            'width': x2 - x1,
+                            'height': y2 - y1,
+                            'aspect_ratio': (x2 - x1) / (y2 - y1) if (y2 - y1) > 0 else 1
+                        }
+                        
+                        # Add to specific cell type list
+                        all_detections[cell_type].append(cell_data)
+                        # Add to master list
+                        all_detections['All_Cells'].append(cell_data)
+                        total_cells_detected += 1
+        
+        # Calculate comprehensive statistics
+        stats = {
+            'total_cells_detected': total_cells_detected,
+            'RBC_count': len(all_detections['RBC']),
+            'WBC_count': len(all_detections['WBC']),
+            'Platelet_count': len(all_detections['Platelets']),
+            
+            # Cell distribution percentages
+            'cell_distribution': {
+                'RBC_percentage': (len(all_detections['RBC']) / total_cells_detected * 100) if total_cells_detected > 0 else 0,
+                'WBC_percentage': (len(all_detections['WBC']) / total_cells_detected * 100) if total_cells_detected > 0 else 0,
+                'Platelet_percentage': (len(all_detections['Platelets']) / total_cells_detected * 100) if total_cells_detected > 0 else 0
+            },
+            
+            # Confidence scores
+            'confidence_scores': {
+                'RBC': sum(d['confidence'] for d in all_detections['RBC']) / len(all_detections['RBC']) if all_detections['RBC'] else 0,
+                'WBC': sum(d['confidence'] for d in all_detections['WBC']) / len(all_detections['WBC']) if all_detections['WBC'] else 0,
+                'Platelets': sum(d['confidence'] for d in all_detections['Platelets']) / len(all_detections['Platelets']) if all_detections['Platelets'] else 0,
+                'Overall': sum(d['confidence'] for d in all_detections['All_Cells']) / len(all_detections['All_Cells']) if all_detections['All_Cells'] else 0
+            },
+            
+            # Detection density and coverage
+            'detection_density': total_cells_detected / (640 * 640) if total_cells_detected > 0 else 0,
+            'average_cell_area': sum(detection_areas) / len(detection_areas) if detection_areas else 0,
+            'detection_coverage': len(set([(int(d['center'][0]//50), int(d['center'][1]//50)) for d in all_detections['All_Cells']])),
+            
+            # Size analysis
+            'size_analysis': {
+                'min_area': min(detection_areas) if detection_areas else 0,
+                'max_area': max(detection_areas) if detection_areas else 0,
+                'avg_area': sum(detection_areas) / len(detection_areas) if detection_areas else 0
+            }
+        }
+        
+        # Create detection summary
+        detection_summary = f"🎯 Comprehensive Detection Complete: {total_cells_detected} total cells found"
+        if total_cells_detected > 0:
+            detection_summary += f" | RBC: {stats['RBC_count']}, WBC: {stats['WBC_count']}, Platelets: {stats['Platelet_count']}"
+        
+        print(f"✅ {detection_summary}")
+        print(f"📊 Detection density: {stats['detection_density']:.6f} cells/pixel")
+        print(f"🎯 Coverage areas: {stats['detection_coverage']} grid regions")
+        
+        return {
+            'detections': all_detections,
+            'stats': stats,
+            'raw_results': results,
+            'detection_summary': detection_summary,
+            'detection_method': 'Comprehensive YOLO Detection',
+            'confidence_threshold_used': confidence_threshold
+        }
+        
+    except Exception as e:
+        print(f"❌ Error in comprehensive cell detection: {e}")
+        return None
+
 def preprocess_image(img, output_path=None):
     """
     Preprocess blood cell images for better detection
@@ -117,6 +263,131 @@ def preprocess_image(img, output_path=None):
     except Exception as e:
         print(f"Error preprocessing image: {e}")
         return None
+            
+        # Convert to numpy array for processing
+        img_array = np.array(img)
+        
+        # Apply CLAHE for better contrast
+        lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        lab[:,:,0] = clahe.apply(lab[:,:,0])
+        enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+        
+        # Convert back to PIL
+        enhanced_img = Image.fromarray(enhanced)
+        
+        if output_path:
+            enhanced_img.save(output_path, quality=95)
+        return enhanced_img
+    except Exception as e:
+        print(f"Error preprocessing image: {e}")
+        return None
+def visualize_all_cells(image_path, detection_results, output_path=None, show_confidence=True):
+    """
+    Visualize ALL detected cells with comprehensive annotations
+    
+    Args:
+        image_path: Path to original image
+        detection_results: Results from detect_all_cells_comprehensive
+        output_path: Optional path to save visualization
+        show_confidence: Whether to show confidence scores
+        
+    Returns:
+        str: Path to saved visualization
+    """
+    try:
+        # Load original image
+        if isinstance(image_path, str):
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        else:
+            image = np.array(image_path)
+        
+        # Create figure with larger size for better visibility
+        plt.figure(figsize=(20, 16))
+        plt.imshow(image)
+        
+        # Define colors for each cell type
+        colors = {
+            'RBC': '#ef5350',      # Red
+            'WBC': '#42a5f5',      # Blue
+            'Platelets': '#66bb6a'  # Green
+        }
+        
+        # Get detection data
+        detections = detection_results['detections']
+        stats = detection_results['stats']
+        
+        total_plotted = 0
+        
+        # Plot all detected cells
+        for cell_type in ['RBC', 'WBC', 'Platelets']:
+            cell_list = detections[cell_type]
+            color = colors[cell_type]
+            
+            for cell_data in cell_list:
+                bbox = cell_data['bbox']
+                conf = cell_data['confidence']
+                x1, y1, x2, y2 = bbox
+                
+                # Draw bounding box
+                rect = plt.Rectangle((x1, y1), x2-x1, y2-y1,
+                                   fill=False, color=color,
+                                   linewidth=2, alpha=0.8)
+                plt.gca().add_patch(rect)
+                
+                # Add label with confidence if requested
+                if show_confidence:
+                    label = f'{cell_type} {conf:.2f}'
+                else:
+                    label = cell_type
+                    
+                plt.text(x1, y1-5, label,
+                        color=color, fontsize=10, fontweight='bold',
+                        bbox=dict(facecolor='white', alpha=0.8, 
+                                edgecolor=color, pad=2))
+                total_plotted += 1
+        
+        # Add comprehensive title and statistics
+        title = f'Comprehensive Cell Detection - {stats["total_cells_detected"]} Total Cells Detected'
+        plt.title(title, fontsize=18, fontweight='bold', pad=20)
+        
+        # Add statistics text box
+        stats_text = f"""Detection Summary:
+RBC: {stats['RBC_count']} ({stats['cell_distribution']['RBC_percentage']:.1f}%)
+WBC: {stats['WBC_count']} ({stats['cell_distribution']['WBC_percentage']:.1f}%)
+Platelets: {stats['Platelet_count']} ({stats['cell_distribution']['Platelet_percentage']:.1f}%)
+Overall Confidence: {stats['confidence_scores']['Overall']:.2%}
+Detection Density: {stats['detection_density']:.6f} cells/pixel"""
+        
+        plt.text(0.02, 0.98, stats_text, transform=plt.gca().transAxes,
+                fontsize=12, verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
+        
+        # Add legend
+        legend_elements = [plt.Rectangle((0,0),1,1, facecolor=colors[ct], alpha=0.8, label=f'{ct} ({stats[f"{ct}_count"]})') 
+                          for ct in ['RBC', 'WBC', 'Platelets']]
+        plt.legend(handles=legend_elements, loc='upper right', fontsize=12)
+        
+        plt.axis('off')
+        plt.tight_layout()
+        
+        # Save visualization
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            return output_path
+        else:
+            # Create temporary file
+            temp_path = os.path.join(tempfile.gettempdir(), 'all_cells_comprehensive.png')
+            plt.savefig(temp_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            return temp_path
+            
+    except Exception as e:
+        print(f"❌ Error visualizing all cells: {e}")
+        return None
+
 def augment_with_blur(img_path, output_path, blur_radius=2):
     """Create blurred version for data augmentation"""
     try:
@@ -398,29 +669,45 @@ def plot_confusion_matrix(conf_matrix, classes, save_path='skin_disease_confusio
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-def detect_blood_cells(model, image_path):
+def detect_all_cells(model, image_path, confidence_threshold=0.15):
     """
-    Detect and classify blood cells in an image using YOLO
+    Detect ALL cells in the image with comprehensive detection
     Args:
         model: YOLO model instance
         image_path: Path to the blood smear image
+        confidence_threshold: Lower threshold to detect more cells
     Returns:
-        Dictionary containing detection results
+        Dictionary containing all cell detections
     """
     try:
         if model is None:
             print("YOLO model is not available")
             return None
             
-        # Run inference
-        results = model(image_path)
+        # Configure model for maximum detection
+        original_conf = model.conf
+        original_iou = model.iou
         
-        # Process results
-        detections = {
+        # Lower thresholds to detect more cells
+        model.conf = confidence_threshold  # Lower confidence threshold
+        model.iou = 0.3   # Lower IoU threshold for more detections
+        
+        # Run inference with enhanced settings
+        results = model(image_path, save=False, verbose=False)
+        
+        # Restore original settings
+        model.conf = original_conf
+        model.iou = original_iou
+        
+        # Process results for comprehensive detection
+        all_detections = {
             'RBC': [],
             'WBC': [],
-            'Platelets': []
+            'Platelets': [],
+            'All_Cells': []  # Combined list of all detected cells
         }
+        
+        total_cells_detected = 0
         
         # Extract detection results
         for r in results:
@@ -439,32 +726,56 @@ def detect_blood_cells(model, image_path):
                     if cls < len(class_names):
                         cls_name = class_names[cls]
                         
-                        detections[cls_name].append({
+                        cell_data = {
                             'bbox': [x1, y1, x2, y2],
-                            'confidence': conf
-                        })
+                            'confidence': conf,
+                            'cell_type': cls_name,
+                            'area': (x2 - x1) * (y2 - y1)
+                        }
+                        
+                        all_detections[cls_name].append(cell_data)
+                        all_detections['All_Cells'].append(cell_data)
+                        total_cells_detected += 1
         
-        # Calculate statistics
+        # Calculate comprehensive statistics
         stats = {
-            'RBC_count': len(detections['RBC']),
-            'WBC_count': len(detections['WBC']),
-            'Platelet_count': len(detections['Platelets']),
+            'total_cells_detected': total_cells_detected,
+            'RBC_count': len(all_detections['RBC']),
+            'WBC_count': len(all_detections['WBC']),
+            'Platelet_count': len(all_detections['Platelets']),
+            'cell_distribution': {
+                'RBC_percentage': (len(all_detections['RBC']) / total_cells_detected * 100) if total_cells_detected > 0 else 0,
+                'WBC_percentage': (len(all_detections['WBC']) / total_cells_detected * 100) if total_cells_detected > 0 else 0,
+                'Platelet_percentage': (len(all_detections['Platelets']) / total_cells_detected * 100) if total_cells_detected > 0 else 0
+            },
             'confidence_scores': {
-                'RBC': sum(d['confidence'] for d in detections['RBC']) / len(detections['RBC']) if detections['RBC'] else 0,
-                'WBC': sum(d['confidence'] for d in detections['WBC']) / len(detections['WBC']) if detections['WBC'] else 0,
-                'Platelets': sum(d['confidence'] for d in detections['Platelets']) / len(detections['Platelets']) if detections['Platelets'] else 0
-            }
+                'RBC': sum(d['confidence'] for d in all_detections['RBC']) / len(all_detections['RBC']) if all_detections['RBC'] else 0,
+                'WBC': sum(d['confidence'] for d in all_detections['WBC']) / len(all_detections['WBC']) if all_detections['WBC'] else 0,
+                'Platelets': sum(d['confidence'] for d in all_detections['Platelets']) / len(all_detections['Platelets']) if all_detections['Platelets'] else 0,
+                'Overall': sum(d['confidence'] for d in all_detections['All_Cells']) / len(all_detections['All_Cells']) if all_detections['All_Cells'] else 0
+            },
+            'detection_density': total_cells_detected / (640 * 640) if total_cells_detected > 0 else 0  # cells per pixel area
         }
         
+        print(f"🔍 Total cells detected: {total_cells_detected}")
+        print(f"📊 RBC: {stats['RBC_count']}, WBC: {stats['WBC_count']}, Platelets: {stats['Platelet_count']}")
+        
         return {
-            'detections': detections,
+            'detections': all_detections,
             'stats': stats,
-            'raw_results': results
+            'raw_results': results,
+            'detection_summary': f"Detected {total_cells_detected} total cells: {stats['RBC_count']} RBC, {stats['WBC_count']} WBC, {stats['Platelet_count']} Platelets"
         }
         
     except Exception as e:
-        print(f"Error detecting blood cells: {e}")
+        print(f"Error detecting all cells: {e}")
         return None
+
+def detect_blood_cells(model, image_path):
+    """
+    Wrapper function for backward compatibility - calls detect_all_cells
+    """
+    return detect_all_cells(model, image_path)
     model.eval()
     
     # Transform image
@@ -701,9 +1012,9 @@ def combined_prediction(image, cnn_model, classes, ai_analysis=None):
             'confidence_spread': 0.0
         }
 
-def plot_metrics(results: Dict[str, any], save_dir: str = './plots') -> Dict[str, str]:
+def plot_comprehensive_metrics(results: Dict[str, any], save_dir: str = './plots') -> Dict[str, str]:
     """
-    Plot metrics for blood cell detection
+    Plot comprehensive metrics for ALL cell detection
     
     Args:
         results: Detection results from YOLO model containing stats
@@ -717,95 +1028,189 @@ def plot_metrics(results: Dict[str, any], save_dir: str = './plots') -> Dict[str
     # Extract detection statistics
     stats = results['stats']
     
-    # Create bar plot of cell counts
-    plt.figure(figsize=(12, 6))
-    cell_types = ['RBC', 'WBC', 'Platelets']
-    counts = [stats['RBC_count'], stats['WBC_count'], stats['Platelet_count']]
-    colors = ['#ef5350', '#42a5f5', '#66bb6a']
+    # Create comprehensive cell count plot
+    plt.figure(figsize=(15, 10))
     
-    plt.bar(cell_types, counts, color=colors)
-    plt.title('Blood Cell Count Distribution', fontsize=14, pad=20)
+    # Subplot 1: Cell counts
+    plt.subplot(2, 2, 1)
+    cell_types = ['RBC', 'WBC', 'Platelets', 'Total']
+    counts = [stats['RBC_count'], stats['WBC_count'], stats['Platelet_count'], stats['total_cells_detected']]
+    colors = ['#ef5350', '#42a5f5', '#66bb6a', '#ff9800']
+    
+    bars = plt.bar(cell_types, counts, color=colors)
+    plt.title('Cell Count Distribution', fontsize=14, pad=20)
     plt.ylabel('Count', fontsize=12)
     plt.grid(True, alpha=0.3)
     
     # Add count labels on top of bars
-    for i, count in enumerate(counts):
-        plt.text(i, count, str(count), 
-                horizontalalignment='center', 
-                verticalalignment='bottom')
+    for bar, count in zip(bars, counts):
+        plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5, 
+                str(count), ha='center', va='bottom', fontweight='bold')
     
-    counts_path = os.path.join(save_dir, 'cell_counts.png')
-    plt.savefig(counts_path, dpi=300, bbox_inches='tight')
-    plt.close()
+    # Subplot 2: Cell distribution percentages
+    plt.subplot(2, 2, 2)
+    distribution = stats['cell_distribution']
+    pie_data = [distribution['RBC_percentage'], distribution['WBC_percentage'], distribution['Platelet_percentage']]
+    pie_labels = ['RBC', 'WBC', 'Platelets']
+    pie_colors = ['#ef5350', '#42a5f5', '#66bb6a']
     
-    # Create confidence score plot
-    plt.figure(figsize=(12, 6))
-    conf_scores = [stats['confidence_scores'][cell_type] for cell_type in cell_types]
+    plt.pie(pie_data, labels=pie_labels, colors=pie_colors, autopct='%1.1f%%', startangle=90)
+    plt.title('Cell Type Distribution', fontsize=14)
     
-    plt.bar(cell_types, conf_scores, color=colors)
-    plt.title('Detection Confidence Scores', fontsize=14, pad=20)
+    # Subplot 3: Confidence scores
+    plt.subplot(2, 2, 3)
+    conf_types = ['RBC', 'WBC', 'Platelets', 'Overall']
+    conf_scores = [stats['confidence_scores']['RBC'], stats['confidence_scores']['WBC'], 
+                   stats['confidence_scores']['Platelets'], stats['confidence_scores']['Overall']]
+    
+    bars = plt.bar(conf_types, conf_scores, color=colors)
+    plt.title('Detection Confidence Scores', fontsize=14)
     plt.ylabel('Average Confidence', fontsize=12)
     plt.ylim(0, 1)
     plt.grid(True, alpha=0.3)
     
     # Add confidence score labels
-    for i, score in enumerate(conf_scores):
-        plt.text(i, score, f'{score:.2%}',
-                horizontalalignment='center',
-                verticalalignment='bottom')
+    for bar, score in zip(bars, conf_scores):
+        plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01, 
+                f'{score:.2%}', ha='center', va='bottom', fontweight='bold')
     
-    conf_path = os.path.join(save_dir, 'confidence_scores.png')
-    plt.savefig(conf_path, dpi=300, bbox_inches='tight')
+    # Subplot 4: Detection density
+    plt.subplot(2, 2, 4)
+    density_data = [stats['detection_density'] * 1000000]  # Convert to cells per million pixels
+    plt.bar(['Detection Density'], density_data, color='#9c27b0')
+    plt.title('Cell Detection Density', fontsize=14)
+    plt.ylabel('Cells per Million Pixels', fontsize=12)
+    plt.grid(True, alpha=0.3)
+    
+    for i, density in enumerate(density_data):
+        plt.text(i, density + density*0.05, f'{density:.1f}', 
+                ha='center', va='bottom', fontweight='bold')
+    
+    plt.tight_layout()
+    
+    comprehensive_path = os.path.join(save_dir, 'comprehensive_metrics.png')
+    plt.savefig(comprehensive_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Create detailed cell count comparison
+    plt.figure(figsize=(12, 8))
+    
+    # Comparison with typical blood cell ratios
+    typical_ratios = {'RBC': 85, 'WBC': 1, 'Platelets': 14}  # Approximate percentages
+    detected_ratios = stats['cell_distribution']
+    
+    x = np.arange(len(cell_types[:-1]))  # Exclude 'Total'
+    width = 0.35
+    
+    plt.bar(x - width/2, [typical_ratios['RBC'], typical_ratios['WBC'], typical_ratios['Platelets']], 
+            width, label='Typical Blood Ratios', color='lightgray', alpha=0.7)
+    plt.bar(x + width/2, [detected_ratios['RBC_percentage'], detected_ratios['WBC_percentage'], 
+                         detected_ratios['Platelet_percentage']], 
+            width, label='Detected Ratios', color=['#ef5350', '#42a5f5', '#66bb6a'])
+    
+    plt.xlabel('Cell Types')
+    plt.ylabel('Percentage (%)')
+    plt.title('Detected vs Typical Blood Cell Ratios')
+    plt.xticks(x, ['RBC', 'WBC', 'Platelets'])
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    comparison_path = os.path.join(save_dir, 'ratio_comparison.png')
+    plt.savefig(comparison_path, dpi=300, bbox_inches='tight')
     plt.close()
     
     return {
-        'cell_counts_plot': counts_path,
-        'confidence_plot': conf_path
+        'comprehensive_metrics': comprehensive_path,
+        'ratio_comparison': comparison_path,
+        'cell_counts_plot': comprehensive_path,  # For backward compatibility
+        'confidence_plot': comprehensive_path    # For backward compatibility
     }
 
-def plot_detection_results(image: np.ndarray, detections: dict, 
-                         output_path: str = None) -> str:
+def plot_metrics(results: Dict[str, any], save_dir: str = './plots') -> Dict[str, str]:
     """
-    Plot blood cell detection results on the image
+    Wrapper function for backward compatibility - calls plot_comprehensive_metrics
+    """
+    return plot_comprehensive_metrics(results, save_dir)
+
+def plot_all_cell_detections(image: np.ndarray, detections: dict, 
+                           output_path: str = None, show_all: bool = True) -> str:
+    """
+    Plot ALL detected cells with comprehensive visualization
     
     Args:
         image: Original image as numpy array
         detections: Dictionary containing detection results
         output_path: Optional path to save the visualization
+        show_all: Whether to show all cells or just high-confidence ones
         
     Returns:
         str: Path to saved visualization if output_path provided
     """
     try:
-        plt.figure(figsize=(15, 10))
-        plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        plt.figure(figsize=(20, 15))
+        
+        # Convert image for display
+        if len(image.shape) == 3:
+            if image.shape[2] == 3:
+                display_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            else:
+                display_image = image
+        else:
+            display_image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+            
+        plt.imshow(display_image)
         
         colors = {
             'RBC': '#ef5350',      # Red
-            'WBC': '#42a5f5',      # Blue
-            'Platelets': '#66bb6a'  # Green
+            'WBC': '#42a5f5',      # Blue  
+            'Platelets': '#66bb6a', # Green
+            'All_Cells': '#ff9800'  # Orange for mixed
         }
         
-        # Plot detections for each cell type
-        for cell_type, boxes in detections.items():
-            color = colors.get(cell_type)
-            for box in boxes:
-                x1, y1, x2, y2, conf = box
-                
-                # Draw bounding box
-                rect = plt.Rectangle((x1, y1), x2-x1, y2-y1,
-                                   fill=False, color=color,
-                                   linewidth=2)
-                plt.gca().add_patch(rect)
-                
-                # Add label
-                plt.text(x1, y1-5, f'{cell_type} {conf:.2f}',
-                        color=color, fontsize=10,
-                        bbox=dict(facecolor='white',
-                                alpha=0.8,
-                                edgecolor=None))
+        total_plotted = 0
         
+        # Plot detections for each cell type
+        for cell_type, cell_list in detections.items():
+            if cell_type == 'All_Cells':
+                continue  # Skip the combined list
+                
+            color = colors.get(cell_type, '#ff9800')
+            
+            for cell_data in cell_list:
+                if isinstance(cell_data, dict):
+                    bbox = cell_data['bbox']
+                    conf = cell_data['confidence']
+                    x1, y1, x2, y2 = bbox
+                else:
+                    # Handle old format
+                    x1, y1, x2, y2 = cell_data['bbox']
+                    conf = cell_data['confidence']
+                
+                # Show all cells or only high confidence ones
+                if show_all or conf > 0.3:
+                    # Draw bounding box
+                    rect = plt.Rectangle((x1, y1), x2-x1, y2-y1,
+                                       fill=False, color=color,
+                                       linewidth=1.5, alpha=0.8)
+                    plt.gca().add_patch(rect)
+                    
+                    # Add label with smaller font for better visibility
+                    plt.text(x1, y1-3, f'{cell_type[:3]} {conf:.2f}',
+                            color=color, fontsize=8,
+                            bbox=dict(facecolor='white',
+                                    alpha=0.7,
+                                    edgecolor=None,
+                                    pad=1))
+                    total_plotted += 1
+        
+        plt.title(f'All Cell Detection Results - {total_plotted} cells visualized', 
+                 fontsize=16, pad=20)
         plt.axis('off')
+        
+        # Add legend
+        legend_elements = [plt.Rectangle((0,0),1,1, facecolor=colors[ct], alpha=0.8, label=ct) 
+                          for ct in ['RBC', 'WBC', 'Platelets']]
+        plt.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1, 1))
         
         if output_path:
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
@@ -815,14 +1220,21 @@ def plot_detection_results(image: np.ndarray, detections: dict,
             # Create temporary file
             import tempfile
             temp_path = os.path.join(tempfile.gettempdir(),
-                                   'blood_cell_detection.png')
+                                   'all_cells_detection.png')
             plt.savefig(temp_path, dpi=300, bbox_inches='tight')
             plt.close()
             return temp_path
             
     except Exception as e:
-        print(f"Error plotting detection results: {e}")
+        print(f"Error plotting all cell detections: {e}")
         return None
+
+def plot_detection_results(image: np.ndarray, detections: dict, 
+                         output_path: str = None) -> str:
+    """
+    Wrapper function for backward compatibility - calls plot_all_cell_detections
+    """
+    return plot_all_cell_detections(image, detections, output_path, show_all=True)
 
 def analyze_blood_metrics(detection_results: dict) -> dict:
     """
