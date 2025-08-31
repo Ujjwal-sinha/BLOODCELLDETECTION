@@ -782,15 +782,39 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
         <p style="color: rgba(255, 255, 255, 0.9); text-align: center; font-size: 1rem; margin-bottom: 0;">Your comprehensive blood cell analysis is ready</p>
     </div>
     """, unsafe_allow_html=True)
+
+    # Add custom CSS for better tab visibility
+    st.markdown("""
+    <style>
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2px;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: auto;
+            padding: 10px 16px;
+            background-color: white;
+            border-radius: 4px;
+            margin-right: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Create tabs for results with clear sections
+    # Create the main tabs with clear labels
     tab_overview, tab_analysis, tab_clinical, tab_stats = st.tabs([
         "📊 Detection Results", 
-        "🔬 Detailed Analysis", 
+        "🔬 Analysis Details", 
         "👨‍⚕️ Clinical Report",
-        "📈 Statistical Analysis"
-        "📈 Statistics",
-        "💡 Recommendations"
+        "📈 Statistics & Report"
     ])
     
     # Detection Results Tab
@@ -989,7 +1013,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
         else:
             st.info("No clinical data available for analysis")
     
-    with main_tab1:
+    with tab_overview:
         col1, col2 = st.columns([1, 1])
         
         with col1:
@@ -1043,7 +1067,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
                 </div>
                 """, unsafe_allow_html=True)
     
-    with main_tab2:
+    with tab_analysis:
         if st.session_state.report_data and "report" in st.session_state.report_data:
             report_content = st.session_state.report_data["report"]
         else:
@@ -1077,7 +1101,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
         
         st.markdown("</div>", unsafe_allow_html=True)
     
-    with main_tab3:
+    with tab_clinical:
         st.markdown("""
         <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
             <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.3rem;">Complete Blood Cell Report</h3>
@@ -1113,7 +1137,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
         
         st.markdown("</div>", unsafe_allow_html=True)
     
-    with main_tab4:
+    with tab_stats:
         st.markdown("""
         <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
             <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.3rem;">Cell Statistics & Visualizations</h3>
@@ -1210,8 +1234,8 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
             df = pd.DataFrame(table_data)
             st.dataframe(df, use_container_width=True)
             
-        with main_tab5:
-            st.markdown("### 🏥 Health Recommendations")
+        with tab_stats:
+            st.markdown("### 📈 Statistics & Recommendations")
             if 'report_data' in st.session_state and st.session_state.report_data.get('cell_counts'):
                 cell_counts = st.session_state.report_data['cell_counts']
                 
