@@ -446,47 +446,47 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
     analysis_container.info("Analyzing blood smear image...")
     
     try:
-            # Check image quality
-            quality_score = check_image_quality(image)
-            
-            # Describe image using BLIP
-            from utils import describe_image
-            image_description = describe_image(image) if processor and blip_model else "Blood smear image for analysis"
-            
-            # Use YOLO model for blood cell detection
-            if yolo_model is not None:
-                # Save image temporarily for YOLO processing
-                import tempfile
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
-                    image.save(tmp_file.name)
-                    
-                    # Run comprehensive cell detection to find ALL cells
-                    print("Starting comprehensive cell detection...")
-                    
-                    # Use a progress container to avoid WebSocket issues
-                    progress_container = st.empty()
-                    progress_container.info("🔍 Running comprehensive blood cell detection with maximum sensitivity...")
-                    
-                    try:
-                        detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.005)
-                        progress_container.empty()  # Clear the progress message
-                    except Exception as detection_error:
-                        progress_container.error(f"Detection error: {str(detection_error)}")
-                        detection_results = None
-                    
-                    # Clean up temp file
-                    os.unlink(tmp_file.name)
+        # Check image quality
+        quality_score = check_image_quality(image)
+        
+        # Describe image using BLIP
+        from utils import describe_image
+        image_description = describe_image(image) if processor and blip_model else "Blood smear image for analysis"
+        
+        # Use YOLO model for blood cell detection
+        if yolo_model is not None:
+            # Save image temporarily for YOLO processing
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+                image.save(tmp_file.name)
                 
-                if detection_results:
-                    stats = detection_results['stats']
-                    detections = detection_results['detections']
-                    
-                    # Display comprehensive detection summary
-                    st.success(f"Detection completed: {detection_results.get('detection_summary', 'Detection completed')}")
-                    
-                    # Show detailed detection statistics
-                    total_detected = stats.get('total_cells_detected', 0)
-                    if total_detected > 0:
+                # Run comprehensive cell detection to find ALL cells
+                print("Starting comprehensive cell detection...")
+                
+                # Use a progress container to avoid WebSocket issues
+                progress_container = st.empty()
+                progress_container.info("🔍 Running comprehensive blood cell detection with maximum sensitivity...")
+                
+                try:
+                    detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.005)
+                    progress_container.empty()  # Clear the progress message
+                except Exception as detection_error:
+                    progress_container.error(f"Detection error: {str(detection_error)}")
+                    detection_results = None
+                
+                # Clean up temp file
+                os.unlink(tmp_file.name)
+            
+            if detection_results:
+                stats = detection_results['stats']
+                detections = detection_results['detections']
+                
+                # Display comprehensive detection summary
+                st.success(f"Detection completed: {detection_results.get('detection_summary', 'Detection completed')}")
+                
+                # Show detailed detection statistics
+                total_detected = stats.get('total_cells_detected', 0)
+                if total_detected > 0:
                         st.info(f"""
                         **Comprehensive Detection Results:**
                         - **Total Cells Found:** {total_detected}
