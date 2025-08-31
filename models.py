@@ -254,10 +254,8 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
             'confidence_threshold_used': confidence_threshold
         }
         
-        # Automatically generate explainability analysis
-        print("\n🔬 Auto-generating explainability analysis...")
-        explainability_results = generate_automatic_explainability(image_path, detection_results, model)
-        detection_results['explainability'] = explainability_results
+        # Detection complete - explainability removed for focus on core detection
+        print("\n✅ Detection analysis complete!")
         
         return detection_results
         
@@ -359,63 +357,78 @@ def create_enhanced_detection(image_path):
         # Multiple circle detection passes with different parameters
         all_circles = []
         
-        # Pass 1: Standard RBC detection
+        # Pass 1: Standard RBC detection (optimized for more detection)
         circles1 = cv2.HoughCircles(
             enhanced,
             cv2.HOUGH_GRADIENT,
             dp=1,
-            minDist=8,   # Closer circles allowed
-            param1=50,
-            param2=20,   # Lower accumulator threshold
-            minRadius=4,
-            maxRadius=25
+            minDist=5,   # Allow closer circles
+            param1=40,   # Lower edge threshold
+            param2=15,   # Much lower accumulator threshold
+            minRadius=3,
+            maxRadius=30
         )
         if circles1 is not None:
             all_circles.extend(circles1[0])
         
-        # Pass 2: Smaller RBCs
+        # Pass 2: Very small cells (platelets and small RBCs)
         circles2 = cv2.HoughCircles(
             enhanced,
             cv2.HOUGH_GRADIENT,
             dp=1,
-            minDist=6,
-            param1=40,
-            param2=15,
-            minRadius=3,
-            maxRadius=15
+            minDist=3,   # Very close detection
+            param1=30,
+            param2=10,   # Very low threshold
+            minRadius=2,
+            maxRadius=12
         )
         if circles2 is not None:
             all_circles.extend(circles2[0])
         
-        # Pass 3: Larger RBCs
+        # Pass 3: Medium to large cells
         circles3 = cv2.HoughCircles(
             enhanced,
             cv2.HOUGH_GRADIENT,
             dp=1,
-            minDist=15,
-            param1=60,
-            param2=25,
-            minRadius=10,
-            maxRadius=40
+            minDist=8,
+            param1=50,
+            param2=18,
+            minRadius=8,
+            maxRadius=45
+        )
+        
+        # Pass 4: Additional pass with different preprocessing
+        enhanced2 = cv2.equalizeHist(gray)
+        circles4 = cv2.HoughCircles(
+            enhanced2,
+            cv2.HOUGH_GRADIENT,
+            dp=1,
+            minDist=4,
+            param1=35,
+            param2=12,
+            minRadius=3,
+            maxRadius=35
         )
         if circles3 is not None:
             all_circles.extend(circles3[0])
-        
-        # Pass 4: Very sensitive detection
-        circles4 = cv2.HoughCircles(
-            blurred,
-            cv2.HOUGH_GRADIENT,
-            dp=2,
-            minDist=5,
-            param1=30,
-            param2=12,
-            minRadius=2,
-            maxRadius=30
-        )
         if circles4 is not None:
             all_circles.extend(circles4[0])
         
-        # Remove duplicate circles (those too close to each other)
+        # Pass 5: Very sensitive detection with different blur
+        circles5 = cv2.HoughCircles(
+            blurred,
+            cv2.HOUGH_GRADIENT,
+            dp=2,
+            minDist=4,
+            param1=25,
+            param2=10,
+            minRadius=2,
+            maxRadius=35
+        )
+        if circles5 is not None:
+            all_circles.extend(circles5[0])
+        
+        # Remove duplicate circles (those too close to each other) - less aggressive
         unique_circles = []
         for circle in all_circles:
             x, y, r = circle
@@ -423,7 +436,7 @@ def create_enhanced_detection(image_path):
             for existing in unique_circles:
                 ex, ey, er = existing
                 distance = np.sqrt((x - ex)**2 + (y - ey)**2)
-                if distance < min(r, er) * 0.8:  # If circles overlap significantly
+                if distance < min(r, er) * 0.5:  # Only remove if very close overlap
                     is_duplicate = True
                     break
             if not is_duplicate:
@@ -638,10 +651,8 @@ def create_enhanced_detection(image_path):
             'confidence_threshold_used': 0.5
         }
         
-        # Automatically generate explainability analysis
-        print("\n🔬 Auto-generating explainability analysis...")
-        explainability_results = generate_automatic_explainability(image_path, detection_results, None)
-        detection_results['explainability'] = explainability_results
+        # Detection complete - explainability removed for focus on core detection
+        print("\n✅ Enhanced detection analysis complete!")
         
         return detection_results
         
