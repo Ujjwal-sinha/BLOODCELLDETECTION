@@ -1,5 +1,17 @@
 import os
 import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from datetime import datetime
+import torch
+import tempfile
+import uuid
+import glob
+import yaml
+from PIL import Image
+from torch.utils.data import DataLoader
+from torchvision import transforms
 
 # Set Streamlit page configuration
 st.set_page_config(
@@ -8,16 +20,6 @@ st.set_page_config(
     page_icon="🔬",
     initial_sidebar_state="expanded"
 )
-
-from PIL import Image
-from datetime import datetime
-import torch
-from torch.utils.data import DataLoader
-from torchvision import transforms
-import tempfile
-import uuid
-import glob
-import yaml
 import cv2
 import numpy as np
 
@@ -781,22 +783,48 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
     </div>
     """, unsafe_allow_html=True)
     
-    # Create tabs for results
-    main_tab1, main_tab2, main_tab3, main_tab4, main_tab5 = st.tabs([
-        "Detection Overview", 
-        "Detailed Analysis", 
-        "Clinical Report",
-        "Cell Statistics",
-        "Health Recommendations"
+    # Create tabs for results with clear sections
+    tab_overview, tab_analysis, tab_clinical, tab_stats = st.tabs([
+        "📊 Detection Results", 
+        "🔬 Detailed Analysis", 
+        "👨‍⚕️ Clinical Report",
+        "📈 Statistical Analysis"
+        "📈 Statistics",
+        "💡 Recommendations"
     ])
     
-    with main_tab1:
-        st.markdown("### 🔍 Detection Overview")
-        col1, col2 = st.columns([1, 1])
+    # Detection Results Tab
+    with tab_overview:
+        st.markdown("### � Detection Results")
+        
+        # Image and Summary in columns
+        col1, col2 = st.columns([3, 2])
         
         with col1:
             if st.session_state.report_data and "image" in st.session_state.report_data:
-                st.image(st.session_state.report_data["image"], caption="Blood Smear Analysis", use_column_width=True)
+                st.image(st.session_state.report_data["image"], caption="Blood Smear Image", use_column_width=True)
+            else:
+                st.info("No image available")
+                
+        with col2:
+            st.markdown("#### Detection Summary")
+            if "cell_counts" in st.session_state.report_data:
+                counts = st.session_state.report_data["cell_counts"]
+                
+                # Create metrics with color coding
+                st.metric("Total RBCs", f"{counts.get('RBC', 0):,}", 
+                         delta="Within Range" if 4.5 <= counts.get('RBC', 0) <= 5.5 else "Abnormal")
+                st.metric("Total WBCs", f"{counts.get('WBC', 0):,}",
+                         delta="Within Range" if 4500 <= counts.get('WBC', 0) <= 11000 else "Abnormal")
+                st.metric("Total Platelets", f"{counts.get('Platelets', 0):,}",
+                         delta="Within Range" if 150000 <= counts.get('Platelets', 0) <= 450000 else "Abnormal")
+                
+                # Add confidence score
+                if "confidences" in st.session_state.report_data:
+                    conf = st.session_state.report_data["confidences"]
+                    if conf:
+                        avg_conf = sum(conf) / len(conf)
+                        st.progress(avg_conf, text=f"Detection Confidence: {avg_conf:.1%}")
             else:
                 st.info("No image available")
                 
@@ -810,16 +838,44 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
             else:
                 st.info("No detection results available")
                 
-    with main_tab2:
-        st.markdown("### 📊 Detailed Analysis")
-        if 'report_data' in st.session_state and st.session_state.report_data.get('report'):
-            report_content = st.session_state.report_data['report']
-            st.markdown(report_content)
-        else:
-            st.info("No analysis data available")
+    # Detailed Analysis Tab
+    with tab_analysis:
+        st.markdown("### � Detailed Analysis")
+        if "report_data" in st.session_state and "cell_counts" in st.session_state.report_data:
+            # Cell Distribution Analysis
+            st.markdown("#### Cell Distribution Analysis")
+            counts = st.session_state.report_data["cell_counts"]
+            total = sum(counts.values())
             
-    with main_tab3:
-        st.markdown("### 📋 Clinical Report")
+            if total > 0:
+                # Calculate percentages
+                rbc_pct = (counts.get('RBC', 0) / total) * 100
+                wbc_pct = (counts.get('WBC', 0) / total) * 100
+                plt_pct = (counts.get('Platelets', 0) / total) * 100
+                
+                # Display distribution chart
+                dist_data = {
+                    'Cell Type': ['RBCs', 'WBCs', 'Platelets'],
+                    'Percentage': [rbc_pct, wbc_pct, plt_pct]
+                }
+                st.bar_chart(dist_data, x='Cell Type', y='Percentage')
+                
+                # Add morphology analysis if available
+                if "image_description" in st.session_state.report_data:
+                    st.markdown("#### Morphological Analysis")
+                    st.write(st.session_state.report_data["image_description"])
+                    
+                # Add quality metrics
+                if "quality_score" in st.session_state.report_data:
+                    st.markdown("#### Quality Metrics")
+                    quality = st.session_state.report_data["quality_score"]
+                    st.progress(quality, text=f"Image Quality Score: {quality:.1%}")
+            else:
+                st.warning("No cells detected for analysis")
+            
+    # Clinical Report Tab
+    with tab_clinical:
+        st.markdown("### �‍⚕️ Clinical Report")
         if 'report_data' in st.session_state and st.session_state.report_data.get('cell_counts'):
             counts = st.session_state.report_data['cell_counts']
             
