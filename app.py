@@ -675,11 +675,10 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                             
                             **Note:** This is an AI-powered preliminary analysis. Professional laboratory verification and clinical correlation are essential for accurate diagnosis.
                             """
-                    else:
-                        # Comprehensive analysis without AI agent
-                        total_cells = stats.get('total_cells_detected', 0)
-                        analysis_result = f"""
-                        **Comprehensive Blood Cell Detection Results**
+                    # Comprehensive analysis with detection stats
+                    total_cells = stats.get('total_cells_detected', 0)
+                    analysis_result = f"""
+                    **Comprehensive Blood Cell Detection Results**
                         
                         **Detection Summary:**
                         - Total Cells Detected: {total_cells}
@@ -728,6 +727,22 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                         - Comprehensive cell identification and counting
                         - Professional laboratory verification recommended
                         """
+                    if AGENTS_AVAILABLE and GROQ_API_KEY:
+                        try:
+                            from agents import BloodCellAIAgent
+                            ai_agent = BloodCellAIAgent(GROQ_API_KEY)
+                            analysis_result = ai_agent.analyze_blood_sample(
+                                image_description=image_description,
+                                detected_cells=detected_cells,
+                                confidences=confidences,
+                                count_data=count_data
+                            ).get("analysis", "AI analysis failed")
+                        except Exception as e:
+                            st.error(f"AI analysis failed: {str(e)}")
+                            analysis_result = "Blood cell detection completed successfully. AI analysis not available."
+                    else:
+                        # Fallback when AI agent is not available
+                        analysis_result = "Blood cell detection completed successfully. AI analysis not available."
                     
                     # Store results
                     st.session_state.report_data = {
@@ -742,20 +757,20 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                         "confidences": confidences
                     }
                     
-                    analysis_container.empty()  # Clear progress message
-                    st.success("✅ Blood cell analysis completed!")
-                else:
-                    analysis_container.empty()  # Clear progress message
-                    st.error("❌ No blood cells detected in the image")
+                analysis_container.empty()  # Clear progress message
+                st.success("✅ Blood cell analysis completed!")
             else:
                 analysis_container.empty()  # Clear progress message
-                st.error("❌ YOLO model not available for detection")
-                
-        except Exception as e:
+                st.error("❌ No blood cells detected in the image")
+        else:
             analysis_container.empty()  # Clear progress message
-            st.error(f"❌ Error during blood cell analysis: {str(e)}")
-            if debug_mode:
-                st.exception(e)
+            st.error("❌ YOLO model not available for detection")
+            
+    except Exception as e:
+        analysis_container.empty()  # Clear progress message
+        st.error(f"❌ Error during blood cell analysis: {str(e)}")
+        if debug_mode:
+            st.exception(e)
 
 # Display results
 if 'report_data' in st.session_state and st.session_state.report_data is not None and isinstance(st.session_state.report_data, dict):
