@@ -877,29 +877,33 @@ def generate_lime_explanation(image_path, model, output_path=None):
         image = Image.open(image_path).convert('RGB')
         img_array = np.array(image)
         
-        # Create a simple prediction function for LIME
+        # Create a fast prediction function for LIME
         def predict_fn(images):
-            """Prediction function for LIME"""
+            """Fast prediction function for LIME using color analysis"""
             predictions = []
             for img in images:
-                # Convert to PIL and run detection
-                pil_img = Image.fromarray(img.astype('uint8'))
-                temp_path = tempfile.mktemp(suffix='.jpg')
-                pil_img.save(temp_path)
+                # Fast color-based cell detection
+                hsv = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_RGB2HSV)
                 
-                # Run detection
-                results = detect_all_cells_comprehensive(model, temp_path, confidence_threshold=0.1)
+                # Define color ranges for different cell types
+                red_lower, red_upper = (0, 30, 30), (15, 255, 255)
+                blue_lower, blue_upper = (90, 30, 30), (130, 255, 255)
+                purple_lower, purple_upper = (120, 30, 30), (160, 255, 255)
                 
-                # Clean up temp file
-                os.unlink(temp_path)
+                # Create masks
+                red_mask = cv2.inRange(hsv, red_lower, red_upper)
+                blue_mask = cv2.inRange(hsv, blue_lower, blue_upper)
+                purple_mask = cv2.inRange(hsv, purple_lower, purple_upper)
                 
-                if results and results['stats']['total_cells_detected'] > 0:
-                    # Return probability based on cell count (normalized)
-                    cell_count = results['stats']['total_cells_detected']
-                    prob = min(cell_count / 100.0, 1.0)  # Normalize to 0-1
-                    predictions.append([1-prob, prob])  # [no_cells, cells_detected]
-                else:
-                    predictions.append([1.0, 0.0])  # No cells detected
+                # Calculate cell presence probability
+                total_pixels = img.shape[0] * img.shape[1]
+                red_ratio = np.sum(red_mask > 0) / total_pixels
+                blue_ratio = np.sum(blue_mask > 0) / total_pixels
+                purple_ratio = np.sum(purple_mask > 0) / total_pixels
+                
+                # Combined cell probability
+                cell_prob = min((red_ratio * 2.0 + blue_ratio * 1.5 + purple_ratio * 1.8), 1.0)
+                predictions.append([1-cell_prob, cell_prob])  # [no_cells, cells_detected]
                     
             return np.array(predictions)
         
@@ -918,7 +922,7 @@ def generate_lime_explanation(image_path, model, output_path=None):
             predict_fn,
             top_labels=2,
             hide_color=0,
-            num_samples=100,
+            num_samples=50,  # Reduced for speed
             segmentation_fn=segmentation_fn
         )
         
@@ -990,34 +994,28 @@ def generate_shap_explanation(image_path, model, output_path=None):
         image = Image.open(image_path).convert('RGB')
         img_array = np.array(image)
         
-        # Resize for SHAP (it can be computationally expensive)
-        img_resized = cv2.resize(img_array, (224, 224))
+        # Resize for SHAP (smaller for speed)
+        img_resized = cv2.resize(img_array, (128, 128))
         
-        # Create prediction function for SHAP
+        # Create fast prediction function for SHAP
         def predict_fn(images):
-            """Prediction function for SHAP"""
+            """Fast prediction function for SHAP using color analysis"""
             predictions = []
             for img in images:
-                # Resize back to original size
-                img_full = cv2.resize(img, (img_array.shape[1], img_array.shape[0]))
+                # Fast color-based cell detection
+                hsv = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_RGB2HSV)
                 
-                # Convert to PIL and run detection
-                pil_img = Image.fromarray(img_full.astype('uint8'))
-                temp_path = tempfile.mktemp(suffix='.jpg')
-                pil_img.save(temp_path)
+                # Define color ranges for blood cells
+                red_mask = cv2.inRange(hsv, (0, 30, 30), (15, 255, 255))
+                blue_mask = cv2.inRange(hsv, (90, 30, 30), (130, 255, 255))
+                purple_mask = cv2.inRange(hsv, (120, 30, 30), (160, 255, 255))
                 
-                # Run detection
-                results = detect_all_cells_comprehensive(model, temp_path, confidence_threshold=0.1)
+                # Calculate cell density
+                total_pixels = img.shape[0] * img.shape[1]
+                cell_pixels = np.sum(red_mask > 0) + np.sum(blue_mask > 0) + np.sum(purple_mask > 0)
+                cell_density = min(cell_pixels / total_pixels * 3.0, 1.0)
                 
-                # Clean up temp file
-                os.unlink(temp_path)
-                
-                if results and results['stats']['total_cells_detected'] > 0:
-                    cell_count = results['stats']['total_cells_detected']
-                    prob = min(cell_count / 100.0, 1.0)
-                    predictions.append(prob)
-                else:
-                    predictions.append(0.0)
+                predictions.append(cell_density)
                     
             return np.array(predictions)
         
@@ -1095,16 +1093,20 @@ def generate_gradcam_explanation(image_path, model, output_path=None):
         # Since we're using YOLO (not a standard CNN), we'll create a simulated Grad-CAM
         # by analyzing the detection confidence across different regions
         
-        # Divide image into grid regions
+        # Create fast Grad-CAM style heatmap using color analysis
+        print("📊 Generating fast attention heatmap...")
+        
+        # Convert to HSV for better color analysis
+        hsv_img = cv2.cvtColor((img_array * 255).astype(np.uint8), cv2.COLOR_RGB2HSV)
+        
+        # Define grid size for analysis (larger for speed)
         h, w = img_array.shape[:2]
-        grid_size = 32
+        grid_size = 16  # Reduced for speed
         h_steps = h // grid_size
         w_steps = w // grid_size
         
         # Create heatmap
         heatmap = np.zeros((h_steps, w_steps))
-        
-        print("📊 Analyzing regional detection confidence...")
         
         for i in range(h_steps):
             for j in range(w_steps):
@@ -1112,24 +1114,23 @@ def generate_gradcam_explanation(image_path, model, output_path=None):
                 y1, y2 = i * grid_size, min((i + 1) * grid_size, h)
                 x1, x2 = j * grid_size, min((j + 1) * grid_size, w)
                 
-                region = img_array[y1:y2, x1:x2]
+                region_hsv = hsv_img[y1:y2, x1:x2]
                 
-                # Save region as temp image
-                region_pil = Image.fromarray((region * 255).astype('uint8'))
-                temp_path = tempfile.mktemp(suffix='.jpg')
-                region_pil.save(temp_path)
+                # Fast color-based cell detection
+                red_mask = cv2.inRange(region_hsv, (0, 30, 30), (15, 255, 255))
+                blue_mask = cv2.inRange(region_hsv, (90, 30, 30), (130, 255, 255))
+                purple_mask = cv2.inRange(region_hsv, (120, 30, 30), (160, 255, 255))
                 
-                # Run detection on region
-                results = detect_all_cells_comprehensive(model, temp_path, confidence_threshold=0.05)
-                
-                # Clean up temp file
-                os.unlink(temp_path)
-                
-                # Calculate region importance
-                if results and results['stats']['total_cells_detected'] > 0:
-                    confidence = results['stats']['confidence_scores']['Overall']
-                    cell_density = results['stats']['detection_density']
-                    heatmap[i, j] = confidence * cell_density * 1000  # Scale for visibility
+                # Calculate cell importance score
+                total_pixels = region_hsv.shape[0] * region_hsv.shape[1]
+                if total_pixels > 0:
+                    red_ratio = np.sum(red_mask > 0) / total_pixels
+                    blue_ratio = np.sum(blue_mask > 0) / total_pixels
+                    purple_ratio = np.sum(purple_mask > 0) / total_pixels
+                    
+                    # Weighted importance (RBC=high, WBC=medium, Platelets=low)
+                    importance = red_ratio * 0.8 + purple_ratio * 0.6 + blue_ratio * 0.4
+                    heatmap[i, j] = importance
                 else:
                     heatmap[i, j] = 0
         
@@ -1271,79 +1272,41 @@ def generate_edge_detection_analysis(image_path, detection_results, output_path)
         image = cv2.imread(image_path)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
-        # Apply multiple edge detection methods
+        # Apply fast edge detection (Canny only for speed)
         edges_canny = cv2.Canny(gray, 50, 150)
-        edges_sobel = cv2.Sobel(gray, cv2.CV_64F, 1, 1, ksize=3)
-        edges_sobel = np.uint8(np.absolute(edges_sobel))
-        edges_laplacian = cv2.Laplacian(gray, cv2.CV_64F)
-        edges_laplacian = np.uint8(np.absolute(edges_laplacian))
         
-        # Create visualization
-        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        # Create simplified visualization
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         
         # Original image
-        axes[0, 0].imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        axes[0, 0].set_title('Original Blood Smear', fontsize=14, fontweight='bold')
-        axes[0, 0].axis('off')
+        axes[0].imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        axes[0].set_title('Original Blood Smear', fontsize=14, fontweight='bold')
+        axes[0].axis('off')
         
         # Canny edges
-        axes[0, 1].imshow(edges_canny, cmap='gray')
-        axes[0, 1].set_title('Canny Edge Detection', fontsize=14, fontweight='bold')
-        axes[0, 1].axis('off')
+        axes[1].imshow(edges_canny, cmap='gray')
+        axes[1].set_title('Edge Detection (Cell Boundaries)', fontsize=14, fontweight='bold')
+        axes[1].axis('off')
         
-        # Sobel edges
-        axes[0, 2].imshow(edges_sobel, cmap='gray')
-        axes[0, 2].set_title('Sobel Edge Detection', fontsize=14, fontweight='bold')
-        axes[0, 2].axis('off')
+        # Edges with detections overlay
+        axes[2].imshow(edges_canny, cmap='gray')
         
-        # Laplacian edges
-        axes[1, 0].imshow(edges_laplacian, cmap='gray')
-        axes[1, 0].set_title('Laplacian Edge Detection', fontsize=14, fontweight='bold')
-        axes[1, 0].axis('off')
-        
-        # Combined edges with detections
-        combined_edges = cv2.bitwise_or(edges_canny, edges_sobel)
-        axes[1, 1].imshow(combined_edges, cmap='gray')
-        
-        # Overlay detected cells
+        # Overlay detected cells (simplified)
         detections = detection_results['detections']
         colors = {'RBC': 'red', 'WBC': 'blue', 'Platelets': 'green'}
         
         for cell_type, cell_list in detections.items():
             if cell_type != 'All_Cells':
                 color = colors.get(cell_type, 'yellow')
-                for cell in cell_list:
+                for cell in cell_list[:20]:  # Limit to first 20 for speed
                     bbox = cell['bbox']
                     x1, y1, x2, y2 = bbox
                     rect = plt.Rectangle((x1, y1), x2-x1, y2-y1, 
                                        fill=False, color=color, linewidth=1, alpha=0.8)
-                    axes[1, 1].add_patch(rect)
+                    axes[2].add_patch(rect)
         
-        axes[1, 1].set_title('Combined Edges + Detections', fontsize=14, fontweight='bold')
-        axes[1, 1].axis('off')
-        
-        # Statistics
-        stats = detection_results['stats']
-        stats_text = f"""Edge Detection Analysis:
-        
-Total Cells Detected: {stats['total_cells_detected']}
-RBC: {stats['RBC_count']} cells
-WBC: {stats['WBC_count']} cells  
-Platelets: {stats['Platelet_count']} cells
-
-Edge Density Analysis:
-Canny Edges: {np.sum(edges_canny > 0)} pixels
-Sobel Edges: {np.sum(edges_sobel > 0)} pixels
-Laplacian Edges: {np.sum(edges_laplacian > 0)} pixels
-
-This analysis shows how edge detection
-helps identify cell boundaries and
-contributes to accurate cell detection."""
-        
-        axes[1, 2].text(0.05, 0.95, stats_text, transform=axes[1, 2].transAxes,
-                        fontsize=11, verticalalignment='top',
-                        bbox=dict(boxstyle='round,pad=0.5', facecolor='lightblue', alpha=0.8))
-        axes[1, 2].axis('off')
+        axes[2].set_title('Edges + Cell Detections', fontsize=14, fontweight='bold')
+        axes[2].axis('off')
         
         plt.suptitle('Edge Detection Analysis for Blood Cell Detection', fontsize=16, fontweight='bold')
         plt.tight_layout()
