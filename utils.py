@@ -59,19 +59,7 @@ except ImportError:
     REQUIRED_PACKAGES['streamlit'] = False
     print("Warning: streamlit not found. Install with: pip install streamlit")
 
-try:
-    from lime import lime_image
-    LIME_AVAILABLE = True
-except ImportError:
-    LIME_AVAILABLE = False
-    print("Warning: lime not found. Install with: pip install lime")
-
-try:
-    import shap
-    SHAP_AVAILABLE = True
-except ImportError:
-    SHAP_AVAILABLE = False
-    print("Warning: shap not found. Install with: pip install shap")
+# Explainability packages removed - focusing on core detection
 
 # Additional ML imports
 try:

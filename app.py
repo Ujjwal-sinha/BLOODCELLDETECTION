@@ -25,9 +25,7 @@ import numpy as np
 from models import (
     device, clear_mps_cache, load_yolo_model, preprocess_image,
     plot_metrics, plot_detection_results, detect_all_cells_comprehensive,
-    visualize_all_cells, generate_automatic_explainability,
-    generate_lime_explanation, generate_shap_explanation, generate_gradcam_explanation,
-    LIME_AVAILABLE, SHAP_AVAILABLE, GRADCAM_AVAILABLE
+    visualize_all_cells
 )
 from utils import (
     load_css, validate_dataset, get_image_transform, check_image_quality,
@@ -581,22 +579,7 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                             """)
                             
                         else:
-                            st.info("🔄 Explainability analysis will be generated automatically with detection results.")
-                            
-                            # Show what would be available
-                            available_methods = ["Edge Detection", "Detection Heatmap"]
-                            if LIME_AVAILABLE:
-                                available_methods.append("LIME")
-                            if SHAP_AVAILABLE:
-                                available_methods.append("SHAP")
-                            if GRADCAM_AVAILABLE:
-                                available_methods.append("Grad-CAM")
-                            
-                            st.markdown(f"**Available methods:** {', '.join(available_methods)}")
-                            
-                            if not any([LIME_AVAILABLE, SHAP_AVAILABLE, GRADCAM_AVAILABLE]):
-                                st.warning("⚠️ Install additional packages for more explainability methods:")
-                                st.code("pip install lime shap grad-cam pytorch-grad-cam")
+                            st.info("✅ Cell detection completed successfully!")
                     
                     else:
                         st.warning("⚠️ No cells detected in the image")
