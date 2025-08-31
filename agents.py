@@ -418,13 +418,26 @@ class BloodCellAIAgent:
         
         # Create analysis prompt
         prompt = f"""
-        Analyze this blood sample comprehensively:
+        Analyze this blood sample comprehensively as a hematology expert:
         
         Image Description: {image_description}
         Detected Cells: {', '.join(detected_cells)}
         Confidence Scores: {', '.join([f'{c:.2f}' for c in confidences])}
         Count Data: {json.dumps(count_data, indent=2)}
         Morphology Notes: {morphology}
+        
+        Provide detailed analysis following this structure:
+        1. General Overview of Sample Quality
+        2. Cell Count Analysis:
+           - RBC Analysis (normal range: 4.5-5.5 million/μL)
+           - WBC Analysis (normal range: 4,500-11,000/μL)
+           - Platelet Analysis (normal range: 150,000-450,000/μL)
+        3. Cell Distribution Assessment
+        4. Potential Clinical Implications
+        5. Risk Factors and Warning Signs
+        6. Recommended Additional Tests
+        7. Treatment Suggestions (if applicable)
+        8. Follow-up Recommendations
         
         Provide a detailed analysis including:
         1. Cell type identification

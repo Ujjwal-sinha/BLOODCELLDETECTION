@@ -782,12 +782,156 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
     """, unsafe_allow_html=True)
     
     # Create tabs for results
-    main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs([
+    main_tab1, main_tab2, main_tab3, main_tab4, main_tab5 = st.tabs([
         "Detection Overview", 
         "Detailed Analysis", 
-        "Laboratory Report",
-        "Cell Statistics"
+        "Clinical Report",
+        "Cell Statistics",
+        "Health Recommendations"
     ])
+    
+    with main_tab1:
+        st.markdown("### 🔍 Detection Overview")
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            if st.session_state.report_data and "image" in st.session_state.report_data:
+                st.image(st.session_state.report_data["image"], caption="Blood Smear Analysis", use_column_width=True)
+            else:
+                st.info("No image available")
+                
+        with col2:
+            st.markdown("#### Detection Results")
+            if st.session_state.report_data and "cell_counts" in st.session_state.report_data:
+                counts = st.session_state.report_data["cell_counts"]
+                st.metric("Total RBCs", f"{counts.get('RBC', 0):,}")
+                st.metric("Total WBCs", f"{counts.get('WBC', 0):,}")
+                st.metric("Total Platelets", f"{counts.get('Platelets', 0):,}")
+            else:
+                st.info("No detection results available")
+                
+    with main_tab2:
+        st.markdown("### 📊 Detailed Analysis")
+        if 'report_data' in st.session_state and st.session_state.report_data.get('report'):
+            report_content = st.session_state.report_data['report']
+            st.markdown(report_content)
+        else:
+            st.info("No analysis data available")
+            
+    with main_tab3:
+        st.markdown("### 📋 Clinical Report")
+        if 'report_data' in st.session_state and st.session_state.report_data.get('cell_counts'):
+            counts = st.session_state.report_data['cell_counts']
+            
+            # Calculate clinical indicators
+            rbc_status = "Normal"
+            wbc_status = "Normal"
+            platelet_status = "Normal"
+            
+            if counts.get('RBC', 0) < 4.5:
+                rbc_status = "Low"
+            elif counts.get('RBC', 0) > 5.5:
+                rbc_status = "High"
+                
+            if counts.get('WBC', 0) < 4500:
+                wbc_status = "Low"
+            elif counts.get('WBC', 0) > 11000:
+                wbc_status = "High"
+                
+            if counts.get('Platelets', 0) < 150000:
+                platelet_status = "Low"
+            elif counts.get('Platelets', 0) > 450000:
+                platelet_status = "High"
+            
+            # Display clinical analysis
+            st.markdown("""
+            #### 🔬 Clinical Analysis Report
+            
+            This report provides a comprehensive analysis of the blood cell populations and their clinical significance.
+            """)
+            
+            st.markdown(f"""
+            ##### Cell Population Analysis
+            
+            1. **Red Blood Cells (RBC)**: {rbc_status}
+               - Current Value: {counts.get('RBC', 0):,.1f} million/μL
+               - Reference Range: 4.5-5.5 million/μL
+               - Clinical Indication: {
+                   "Possible anemia" if rbc_status == "Low"
+                   else "Possible polycythemia" if rbc_status == "High"
+                   else "Normal oxygen-carrying capacity"
+               }
+            
+            2. **White Blood Cells (WBC)**: {wbc_status}
+               - Current Value: {counts.get('WBC', 0):,.0f}/μL
+               - Reference Range: 4,500-11,000/μL
+               - Clinical Indication: {
+                   "Possible immunodeficiency" if wbc_status == "Low"
+                   else "Possible infection/inflammation" if wbc_status == "High"
+                   else "Normal immune function"
+               }
+            
+            3. **Platelets**: {platelet_status}
+               - Current Value: {counts.get('Platelets', 0):,.0f}/μL
+               - Reference Range: 150,000-450,000/μL
+               - Clinical Indication: {
+                   "Possible thrombocytopenia" if platelet_status == "Low"
+                   else "Possible thrombocytosis" if platelet_status == "High"
+                   else "Normal clotting function"
+               }
+            """)
+            
+            # Add clinical recommendations
+            st.markdown("""
+            #### 👨‍⚕️ Clinical Recommendations
+            
+            Based on the blood cell analysis, the following recommendations are provided:
+            """)
+            
+            if rbc_status != "Normal" or wbc_status != "Normal" or platelet_status != "Normal":
+                st.warning("⚠️ Abnormal values detected - Medical consultation recommended")
+                
+                recommendations = []
+                if rbc_status != "Normal":
+                    recommendations.append("""
+                    **RBC Recommendations:**
+                    - Complete blood count (CBC) with differential
+                    - Iron studies
+                    - Vitamin B12 and folate levels
+                    - Reticulocyte count
+                    """)
+                
+                if wbc_status != "Normal":
+                    recommendations.append("""
+                    **WBC Recommendations:**
+                    - WBC differential count
+                    - Infection screening
+                    - Inflammatory marker tests
+                    - Immune system evaluation
+                    """)
+                
+                if platelet_status != "Normal":
+                    recommendations.append("""
+                    **Platelet Recommendations:**
+                    - Platelet function tests
+                    - Bleeding time assessment
+                    - Bone marrow evaluation if indicated
+                    - Coagulation profile
+                    """)
+                
+                for rec in recommendations:
+                    st.markdown(rec)
+            else:
+                st.success("✅ All values within normal ranges")
+                st.markdown("""
+                **General Recommendations:**
+                - Regular health check-ups
+                - Annual blood work
+                - Maintain healthy lifestyle
+                - Follow preventive care guidelines
+                """)
+        else:
+            st.info("No clinical data available for analysis")
     
     with main_tab1:
         col1, col2 = st.columns([1, 1])
@@ -1010,8 +1154,115 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
             df = pd.DataFrame(table_data)
             st.dataframe(df, use_container_width=True)
             
-        else:
-            st.info("No statistical data available. Please run an analysis first.")
+        with main_tab5:
+            st.markdown("### 🏥 Health Recommendations")
+            if 'report_data' in st.session_state and st.session_state.report_data.get('cell_counts'):
+                cell_counts = st.session_state.report_data['cell_counts']
+                
+                # Calculate health indicators
+                rbc_count = cell_counts.get('RBC', 0)
+                wbc_count = cell_counts.get('WBC', 0)
+                platelet_count = cell_counts.get('Platelets', 0)
+                
+                # Health status indicators
+                st.markdown("#### 🩺 Health Status Indicators")
+                
+                # RBC Analysis
+                st.markdown("##### Red Blood Cells (RBC)")
+                if 4.5 <= rbc_count <= 5.5:
+                    st.success("✅ RBC count is within normal range")
+                elif rbc_count < 4.5:
+                    st.warning("⚠️ RBC count is below normal range - Possible anemia indicators")
+                    st.markdown("""
+                    **Recommendations:**
+                    - Consider iron supplementation
+                    - Check vitamin B12 and folate levels
+                    - Evaluate for chronic conditions
+                    - Schedule follow-up with hematologist
+                    """)
+                else:
+                    st.warning("⚠️ RBC count is above normal range - Possible polycythemia")
+                    st.markdown("""
+                    **Recommendations:**
+                    - Monitor oxygen saturation
+                    - Check for underlying conditions
+                    - Consider specialist consultation
+                    """)
+                
+                # WBC Analysis
+                st.markdown("##### White Blood Cells (WBC)")
+                if 4500 <= wbc_count <= 11000:
+                    st.success("✅ WBC count is within normal range")
+                elif wbc_count < 4500:
+                    st.warning("⚠️ WBC count is below normal range - Possible immunodeficiency")
+                    st.markdown("""
+                    **Recommendations:**
+                    - Monitor for infections
+                    - Check immune system function
+                    - Consider bone marrow evaluation
+                    - Schedule immunology consultation
+                    """)
+                else:
+                    st.warning("⚠️ WBC count is above normal range - Possible infection or inflammation")
+                    st.markdown("""
+                    **Recommendations:**
+                    - Evaluate for active infections
+                    - Check inflammatory markers
+                    - Consider additional testing
+                    """)
+                
+                # Platelet Analysis
+                st.markdown("##### Platelets")
+                if 150000 <= platelet_count <= 450000:
+                    st.success("✅ Platelet count is within normal range")
+                elif platelet_count < 150000:
+                    st.warning("⚠️ Platelet count is below normal range - Possible thrombocytopenia")
+                    st.markdown("""
+                    **Recommendations:**
+                    - Monitor for bleeding tendency
+                    - Avoid blood thinning medications
+                    - Consider bone marrow evaluation
+                    - Schedule hematology consultation
+                    """)
+                else:
+                    st.warning("⚠️ Platelet count is above normal range - Possible thrombocytosis")
+                    st.markdown("""
+                    **Recommendations:**
+                    - Monitor for clotting risk
+                    - Evaluate for underlying conditions
+                    - Consider specialist consultation
+                    """)
+                
+                # Overall Health Recommendations
+                st.markdown("#### 🌟 General Health Recommendations")
+                st.markdown("""
+                1. **Regular Monitoring**
+                   - Schedule periodic blood tests
+                   - Keep track of trends
+                   - Maintain health records
+                
+                2. **Lifestyle Recommendations**
+                   - Maintain a balanced diet
+                   - Regular exercise
+                   - Adequate hydration
+                   - Sufficient rest
+                
+                3. **Follow-up Care**
+                   - Share results with primary care physician
+                   - Schedule recommended specialist consultations
+                   - Follow prescribed treatments
+                
+                4. **Warning Signs to Watch**
+                   - Unusual fatigue
+                   - Unexplained bruising
+                   - Frequent infections
+                   - Prolonged bleeding
+                
+                ⚠️ **Disclaimer**: This analysis is for informational purposes only. Always consult with healthcare professionals for medical advice and treatment decisions.
+                """)
+            
+            else:
+                st.info("No statistical data available. Please run an analysis first.")
 
 # Reset button
 st.markdown("""
