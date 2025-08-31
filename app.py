@@ -1180,7 +1180,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
             with col2:
                 # Cell count bar chart
                 try:
-                    import matplotlib.pyplot as plt
+                    import matplotlib.pyplot as plt # type: ignore
                     
                     fig, ax = plt.subplots(figsize=(8, 6))
                     
