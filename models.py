@@ -126,6 +126,10 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
             if hasattr(r, 'boxes') and r.boxes is not None:
                 boxes = r.boxes
                 print(f"📦 Processing {len(boxes)} detected objects...")
+            else:
+                print("📦 Processing 0 detected objects...")
+                print("⚠️ No YOLO detections found, trying enhanced detection...")
+                return create_enhanced_detection(image_path)
                 
                 for box in boxes:
                     # Extract box information
@@ -244,6 +248,11 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
         print(f"✅ {detection_summary}")
         print(f"📊 Detection density: {stats['detection_density']:.6f} cells/pixel")
         print(f"🎯 Coverage areas: {stats['detection_coverage']} grid regions")
+        
+        # If YOLO found very few cells, use enhanced detection instead
+        if total_cells_detected < 50:  # Threshold for "too few cells"
+            print(f"⚠️ YOLO only found {total_cells_detected} cells, switching to enhanced detection for better results...")
+            return create_enhanced_detection(image_path)
         
         detection_results = {
             'detections': all_detections,

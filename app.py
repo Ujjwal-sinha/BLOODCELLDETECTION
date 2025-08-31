@@ -461,7 +461,7 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                     # Run comprehensive cell detection to find ALL cells
                     print("Starting comprehensive cell detection...")
                     st.info("🔍 Running comprehensive blood cell detection with maximum sensitivity...")
-                    detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.01)
+                    detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.005)
                     
                     # Clean up temp file
                     os.unlink(tmp_file.name)
