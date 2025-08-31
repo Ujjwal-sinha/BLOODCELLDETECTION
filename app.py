@@ -746,10 +746,25 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                         # Fallback when AI agent is not available
                         analysis_result = "Blood cell detection completed successfully. AI analysis not available."
                     
-                    # Store results
+                    # Store results with comprehensive report
+                    report_text = f"""
+                    ### Blood Cell Analysis Report
+                    
+                    #### Detection Summary
+                    - Total RBCs: {count_data.get('RBC', 0):,}
+                    - Total WBCs: {count_data.get('WBC', 0):,}
+                    - Total Platelets: {count_data.get('Platelets', 0):,}
+                    
+                    #### Analysis Details
+                    {analysis_result}
+                    
+                    #### Clinical Interpretation
+                    {image_description if image_description else 'No clinical interpretation available.'}
+                    """
+                    
                     st.session_state.report_data = {
                         "analysis_type": "blood_cell_detection",
-                        "report": analysis_result,
+                        "report": report_text,
                         "image": image,
                         "image_description": image_description,
                         "quality_score": quality_score,
@@ -852,15 +867,10 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
             else:
                 st.info("No image available")
                 
-        with col2:
-            st.markdown("#### Detection Results")
-            if st.session_state.report_data and "cell_counts" in st.session_state.report_data:
-                counts = st.session_state.report_data["cell_counts"]
-                st.metric("Total RBCs", f"{counts.get('RBC', 0):,}")
-                st.metric("Total WBCs", f"{counts.get('WBC', 0):,}")
-                st.metric("Total Platelets", f"{counts.get('Platelets', 0):,}")
-            else:
-                st.info("No detection results available")
+        # Add report summary if available
+        if "report" in st.session_state.report_data:
+            st.markdown("#### Analysis Summary")
+            st.markdown(st.session_state.report_data["report"])
                 
     # Detailed Analysis Tab
     with tab_analysis:
@@ -1235,14 +1245,38 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
             st.dataframe(df, use_container_width=True)
             
         with tab_stats:
-            st.markdown("### 📈 Statistics & Recommendations")
-            if 'report_data' in st.session_state and st.session_state.report_data.get('cell_counts'):
+            st.markdown("### 📈 Statistics & Report")
+            if 'report_data' in st.session_state and st.session_state.report_data:
+                # Statistical Summary
+                st.markdown("#### Statistical Analysis")
+            if "cell_counts" in st.session_state.report_data:
                 cell_counts = st.session_state.report_data['cell_counts']
                 
-                # Calculate health indicators
-                rbc_count = cell_counts.get('RBC', 0)
-                wbc_count = cell_counts.get('WBC', 0)
-                platelet_count = cell_counts.get('Platelets', 0)
+                # Create a DataFrame for the statistics
+                stats_data = []
+                for cell_type, count in cell_counts.items():
+                    normal_ranges = {
+                        'RBC': '4.5-5.5 million/µL',
+                        'WBC': '4,500-11,000/µL',
+                        'Platelets': '150,000-450,000/µL'
+                    }
+                    stats_data.append({
+                        'Cell Type': cell_type,
+                        'Count': count,
+                        'Normal Range': normal_ranges.get(cell_type, 'N/A')
+                    })
+                
+                # Display statistics in a table
+                st.table(pd.DataFrame(stats_data))
+            
+            # Comprehensive Report
+            st.markdown("#### Full Report")
+            if "report" in st.session_state.report_data:
+                st.markdown("""
+                <div style="background-color: white; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0;">
+                    {}
+                </div>
+                """.format(st.session_state.report_data["report"]), unsafe_allow_html=True)
                 
                 # Health status indicators
                 st.markdown("#### 🩺 Health Status Indicators")
