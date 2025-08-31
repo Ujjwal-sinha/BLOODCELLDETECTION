@@ -298,14 +298,15 @@ def plot_cell_specific_metrics():
         }
     }
     
-    # Create figure with subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12))
+    # Create figure with two separate subplots
+    # 1. Bar Chart
+    plt.figure(figsize=(15, 6))
     
     # Prepare data for plotting
     cell_types = list(cell_metrics.keys())
     metrics = list(cell_metrics[cell_types[0]].keys())
     
-    # 1. Grouped Bar Chart
+    # Grouped Bar Chart
     x = np.arange(len(cell_types))
     width = 0.15
     multiplier = 0
@@ -313,34 +314,40 @@ def plot_cell_specific_metrics():
     for metric in metrics:
         values = [cell_metrics[cell][metric] for cell in cell_types]
         offset = width * multiplier
-        ax1.bar(x + offset, values, width, label=metric)
+        plt.bar(x + offset, values, width, label=metric)
         multiplier += 1
     
-    ax1.set_ylabel('Score')
-    ax1.set_title('Cell-Specific Detection Metrics')
-    ax1.set_xticks(x + width * 2)
-    ax1.set_xticklabels(cell_types)
-    ax1.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
-    ax1.grid(True, alpha=0.3)
+    plt.ylabel('Score')
+    plt.title('Cell-Specific Detection Metrics')
+    plt.xticks(x + width * 2, cell_types)
+    plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig('evaluation_results/cell_metrics_bar.png', dpi=300, bbox_inches='tight')
+    plt.close()
     
-    # 2. Radar Chart
+    # 2. Radar Chart (Spider Plot)
+    plt.figure(figsize=(10, 10))
+    ax = plt.subplot(111, projection='polar')
+    
     angles = np.linspace(0, 2*np.pi, len(metrics), endpoint=False)
     angles = np.concatenate((angles, [angles[0]]))  # complete the circle
     
-    ax2.set_theta_offset(np.pi / 2)
-    ax2.set_theta_direction(-1)
-    ax2.set_rlabel_position(0)
+    ax.set_theta_offset(np.pi / 2)
+    ax.set_theta_direction(-1)
+    ax.set_rlabel_position(0)
     
+    # Plot data on radar chart
     for cell_type in cell_types:
         values = [cell_metrics[cell_type][metric] for metric in metrics]
         values = np.concatenate((values, [values[0]]))  # complete the circle
-        ax2.plot(angles, values, 'o-', linewidth=2, label=cell_type)
-        ax2.fill(angles, values, alpha=0.25)
+        ax.plot(angles, values, 'o-', linewidth=2, label=cell_type)
+        ax.fill(angles, values, alpha=0.25)
     
-    ax2.set_xticks(angles[:-1])
-    ax2.set_xticklabels(metrics)
-    ax2.set_title('Radar Plot of Cell-Specific Metrics')
-    ax2.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(metrics)
+    ax.set_title('Radar Plot of Cell-Specific Metrics')
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
     
     plt.tight_layout()
     plt.savefig('evaluation_results/cell_specific_metrics.png', dpi=300, bbox_inches='tight')
