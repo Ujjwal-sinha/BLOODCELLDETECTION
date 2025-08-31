@@ -441,9 +441,11 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
         st.warning("Please select at least one analysis type.")
         st.stop()
     
-    # Run blood cell analysis
-    with st.spinner("Analyzing blood smear image..."):
-        try:
+    # Run blood cell analysis with WebSocket error handling
+    analysis_container = st.empty()
+    analysis_container.info("Analyzing blood smear image...")
+    
+    try:
             # Check image quality
             quality_score = check_image_quality(image)
             
@@ -460,8 +462,17 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                     
                     # Run comprehensive cell detection to find ALL cells
                     print("Starting comprehensive cell detection...")
-                    st.info("🔍 Running comprehensive blood cell detection with maximum sensitivity...")
-                    detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.005)
+                    
+                    # Use a progress container to avoid WebSocket issues
+                    progress_container = st.empty()
+                    progress_container.info("🔍 Running comprehensive blood cell detection with maximum sensitivity...")
+                    
+                    try:
+                        detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.005)
+                        progress_container.empty()  # Clear the progress message
+                    except Exception as detection_error:
+                        progress_container.error(f"Detection error: {str(detection_error)}")
+                        detection_results = None
                     
                     # Clean up temp file
                     os.unlink(tmp_file.name)
@@ -487,24 +498,29 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                         """)
                         
                                         # Create and display visualization of all detected cells
-                        with st.spinner("Creating comprehensive cell visualization..."):
-                            try:
-                                # Save the current image temporarily for visualization
-                                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as viz_tmp_file:
-                                    image.save(viz_tmp_file.name)
-                                    viz_path = visualize_all_cells(viz_tmp_file.name, detection_results)
-                                    
-                                    if viz_path and os.path.exists(viz_path):
-                                        st.image(viz_path, caption=f"All Detected Cells - {total_detected} cells found", use_column_width=True)
-                                        st.success("✅ All cells visualized successfully!")
-                                    else:
-                                        st.warning("⚠️ Could not create cell visualization")
-                                    
-                                    # Clean up temp file
-                                    os.unlink(viz_tmp_file.name)
-                            except Exception as viz_error:
-                                st.warning(f"⚠️ Visualization error: {str(viz_error)}")
-                                st.info("Detection completed successfully, but visualization failed")
+                        viz_container = st.empty()
+                        viz_container.info("Creating comprehensive cell visualization...")
+                        
+                        try:
+                            # Save the current image temporarily for visualization
+                            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as viz_tmp_file:
+                                image.save(viz_tmp_file.name)
+                                viz_path = visualize_all_cells(viz_tmp_file.name, detection_results)
+                                
+                                viz_container.empty()  # Clear progress message
+                                
+                                if viz_path and os.path.exists(viz_path):
+                                    st.image(viz_path, caption=f"All Detected Cells - {total_detected} cells found", use_column_width=True)
+                                    st.success("✅ All cells visualized successfully!")
+                                else:
+                                    st.warning("⚠️ Could not create cell visualization")
+                                
+                                # Clean up temp file
+                                os.unlink(viz_tmp_file.name)
+                        except Exception as viz_error:
+                            viz_container.empty()
+                            st.warning(f"⚠️ Visualization error: {str(viz_error)}")
+                            st.info("Detection completed successfully, but visualization failed")
                         
                         # 🔬 AUTOMATIC EXPLAINABILITY ANALYSIS SECTION
                         st.markdown("---")
@@ -726,13 +742,17 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                         "confidences": confidences
                     }
                     
+                    analysis_container.empty()  # Clear progress message
                     st.success("✅ Blood cell analysis completed!")
                 else:
+                    analysis_container.empty()  # Clear progress message
                     st.error("❌ No blood cells detected in the image")
             else:
+                analysis_container.empty()  # Clear progress message
                 st.error("❌ YOLO model not available for detection")
                 
         except Exception as e:
+            analysis_container.empty()  # Clear progress message
             st.error(f"❌ Error during blood cell analysis: {str(e)}")
             if debug_mode:
                 st.exception(e)

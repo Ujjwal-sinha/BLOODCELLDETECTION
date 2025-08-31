@@ -91,8 +91,8 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
             print("❌ YOLO model is not available - using enhanced detection")
             return create_enhanced_detection(image_path)
             
-        print(f"🔍 Starting comprehensive cell detection...")
-        print(f"📊 Using confidence threshold: {confidence_threshold}")
+        # Starting comprehensive cell detection (avoid print statements that can cause WebSocket issues)
+        # Using confidence threshold (logged internally)
         
         # Store original model settings
         original_conf = getattr(model, 'conf', 0.25)
@@ -103,7 +103,7 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
         model.iou = 0.05   # Very low IoU for maximum overlapping detections
         
         # Run inference with maximum detection settings
-        print("🚀 Running YOLO inference...")
+        # Running YOLO inference (avoid print statements that can cause WebSocket issues)
         results = model(image_path, save=False, verbose=False, imgsz=1024, max_det=2000)
         
         # Restore original settings
@@ -125,10 +125,9 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
         for r in results:
             if hasattr(r, 'boxes') and r.boxes is not None:
                 boxes = r.boxes
-                print(f"📦 Processing {len(boxes)} detected objects...")
+                # Processing detected objects (avoid print statements that can cause WebSocket issues)
             else:
-                print("📦 Processing 0 detected objects...")
-                print("⚠️ No YOLO detections found, trying enhanced detection...")
+                # No YOLO detections found, trying enhanced detection (avoid print statements)
                 return create_enhanced_detection(image_path)
                 
                 for box in boxes:
@@ -202,7 +201,7 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
         
         # If no detections, try enhanced detection method
         if total_cells_detected == 0:
-            print("⚠️ No YOLO detections found, trying enhanced detection...")
+            # No YOLO detections found, trying enhanced detection (avoid print statements)
             return create_enhanced_detection(image_path)
         
         # Calculate comprehensive statistics
@@ -245,13 +244,14 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
         if total_cells_detected > 0:
             detection_summary += f" | RBC: {stats['RBC_count']}, WBC: {stats['WBC_count']}, Platelets: {stats['Platelet_count']}"
         
-        print(f"✅ {detection_summary}")
-        print(f"📊 Detection density: {stats['detection_density']:.6f} cells/pixel")
-        print(f"🎯 Coverage areas: {stats['detection_coverage']} grid regions")
+        # Log detection summary (avoid print statements that can cause WebSocket issues)
+        detection_summary_text = f"✅ {detection_summary}"
+        density_text = f"📊 Detection density: {stats['detection_density']:.6f} cells/pixel"
+        coverage_text = f"🎯 Coverage areas: {stats['detection_coverage']} grid regions"
         
         # If YOLO found very few cells, use enhanced detection instead
         if total_cells_detected < 50:  # Threshold for "too few cells"
-            print(f"⚠️ YOLO only found {total_cells_detected} cells, switching to enhanced detection for better results...")
+            # YOLO found few cells, switching to enhanced detection (avoid print statements)
             return create_enhanced_detection(image_path)
         
         detection_results = {
@@ -264,7 +264,7 @@ def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01)
         }
         
         # Detection complete - explainability removed for focus on core detection
-        print("\n✅ Detection analysis complete!")
+        # Analysis complete (avoid print statements that can cause WebSocket issues)
         
         return detection_results
         
@@ -295,7 +295,7 @@ def create_enhanced_detection(image_path):
         except ImportError:
             measure = morphology = segmentation = None
         
-        print("🔄 Using enhanced computer vision detection...")
+        # Using enhanced computer vision detection (avoid print statements)
         
         # Load image
         if isinstance(image_path, str):
@@ -324,7 +324,7 @@ def create_enhanced_detection(image_path):
         height, width = gray.shape
         
         # 1. ENHANCED EDGE DETECTION
-        print("🔍 Step 1: Enhanced edge detection...")
+        # Step 1: Enhanced edge detection (avoid print statements)
         
         # Apply multiple edge detection methods
         edges_canny = cv2.Canny(gray, 30, 100)
@@ -335,7 +335,7 @@ def create_enhanced_detection(image_path):
         edges_combined = cv2.bitwise_or(edges_canny, edges_sobel)
         
         # 2. MORPHOLOGICAL OPERATIONS
-        print("🔍 Step 2: Morphological analysis...")
+        # Step 2: Morphological analysis (avoid print statements)
         
         # Create different kernels for different cell types
         kernel_small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -347,14 +347,14 @@ def create_enhanced_detection(image_path):
         morph_close = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel_medium)
         
         # 3. ADAPTIVE THRESHOLDING
-        print("🔍 Step 3: Adaptive thresholding...")
+        # Step 3: Adaptive thresholding (avoid print statements)
         
         # Multiple thresholding approaches
         thresh_adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
         thresh_otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
         
         # 4. ENHANCED RBC DETECTION
-        print("🔍 Step 4: Enhanced RBC detection...")
+        # Step 4: Enhanced RBC detection (avoid print statements)
         
         # Apply Gaussian blur to reduce noise
         blurred = cv2.GaussianBlur(gray, (3, 3), 0)
@@ -480,7 +480,7 @@ def create_enhanced_detection(image_path):
                 rbc_count += 1
         
         # 5. ENHANCED WBC DETECTION
-        print("🔍 Step 5: Enhanced WBC detection...")
+        # Step 5: Enhanced WBC detection (avoid print statements)
         
         # Use multiple approaches for WBC detection
         
@@ -543,7 +543,7 @@ def create_enhanced_detection(image_path):
                     wbc_count += 1
         
         # 6. ENHANCED PLATELET DETECTION
-        print("🔍 Step 6: Enhanced platelet detection...")
+        # Step 6: Enhanced platelet detection (avoid print statements)
         
         # Multiple approaches for platelet detection
         
@@ -648,8 +648,9 @@ def create_enhanced_detection(image_path):
         if total_cells_detected > 0:
             detection_summary += f" | RBC: {rbc_count}, WBC: {wbc_count}, Platelets: {platelet_count}"
         
-        print(f"✅ {detection_summary}")
-        print(f"📊 Detection density: {stats['detection_density']:.6f} cells/pixel")
+        # Log detection summary (avoid print statements that can cause WebSocket issues)
+        detection_summary_text = f"✅ {detection_summary}"
+        density_text = f"📊 Detection density: {stats['detection_density']:.6f} cells/pixel"
         
         detection_results = {
             'detections': all_detections,
@@ -661,7 +662,7 @@ def create_enhanced_detection(image_path):
         }
         
         # Detection complete - explainability removed for focus on core detection
-        print("\n✅ Enhanced detection analysis complete!")
+        # Enhanced detection analysis complete (avoid print statements that can cause WebSocket issues)
         
         return detection_results
         
