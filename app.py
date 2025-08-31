@@ -596,9 +596,9 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                             
                         else:
                             st.info("✅ Cell detection completed successfully!")
-                    
-                    else:
-                        st.warning("⚠️ No cells detected in the image")
+                
+                else:
+                    st.warning("⚠️ No cells detected in the image")
                     
                     # Create analysis prompt for AI agent
                     detected_cells = []
