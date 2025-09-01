@@ -341,3 +341,12 @@ Quality Assessment of blood smear images
 **⚠️ Disclaimer**: This tool is for research and educational purposes only. Not intended for clinical diagnosis. Always consult qualified medical professionals for health-related decisions.
 
 **🩸 BloodCellAI** - Advancing hematological analysis through artificial intelligence.
+
+
+Abstract
+
+This project presents an advanced AI-powered platform for automated blood cell detection and analysis using deep learning and computer vision techniques. Leveraging a fine-tuned YOLOv8 object detection model, the system is trained on a curated blood smear image dataset to accurately identify and classify three primary blood cell types: Red Blood Cells (RBCs), White Blood Cells (WBCs), and Platelets. The model training process incorporates extensive data augmentation, adaptive learning rate scheduling, and early stopping to optimize performance and prevent overfitting. The training was conducted for 80 epochs, achieving a high validation accuracy of 99.39%, demonstrating the model’s robustness and generalization capability.
+
+Comprehensive evaluation metrics are integrated into the workflow, including precision, recall, F1-score, mean Average Precision (mAP), and confusion matrix analysis for each cell type. The system also generates Receiver Operating Characteristic (ROC) curves, loss curves, learning rate schedules, and other research-standard visualizations to provide in-depth insights into model performance. Post-training, the model’s predictions are visualized on test images, highlighting detected cells with bounding boxes and confidence scores, facilitating qualitative assessment.
+
+A detailed analysis report is automatically generated, summarizing overall and per-class performance, training configuration, and key findings. The platform is designed for extensibility, allowing further fine-tuning or transfer learning with new datasets. The entire pipeline is implemented for seamless execution in environments such as Google Colab, ensuring accessibility and reproducibility. This work demonstrates the effectiveness of deep learning for hematological analysis, offering a reliable, scalable, and interpretable solution for automated blood cell detection, with potential applications in clinical diagnostics, research, and laboratory automation.
