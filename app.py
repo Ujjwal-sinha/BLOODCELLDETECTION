@@ -554,10 +554,19 @@ if st.button("Start Comprehensive Analysis", type="primary", key="analyze_button
                         with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as viz_tmp_file:
                             cv2.imwrite(viz_tmp_file.name, st.session_state.current_image)
                             
-                            # Generate three different visualizations
-                            viz_path_all = visualize_all_cells(viz_tmp_file.name, detection_results, output_path='viz_all_cells.png')
-                            viz_path_wbc = visualize_all_cells(viz_tmp_file.name, detection_results, output_path='viz_wbc_focus.png')
-                            viz_path_platelets = visualize_all_cells(viz_tmp_file.name, detection_results, output_path='viz_platelets_focus.png')
+                            # Generate visualizations for each cell type
+                            viz_rbc = create_cell_specific_visualizations(cv2.imread(viz_tmp_file.name), detection_results)['RBC_visualization']
+                            viz_wbc = create_cell_specific_visualizations(cv2.imread(viz_tmp_file.name), detection_results)['WBC_visualization']
+                            viz_platelets = create_cell_specific_visualizations(cv2.imread(viz_tmp_file.name), detection_results)['Platelet_visualization']
+                            
+                            # Save visualizations
+                            cv2.imwrite('viz_all_cells.png', viz_rbc)
+                            cv2.imwrite('viz_wbc_focus.png', viz_wbc)
+                            cv2.imwrite('viz_platelets_focus.png', viz_platelets)
+                            
+                            viz_path_all = 'viz_all_cells.png'
+                            viz_path_wbc = 'viz_wbc_focus.png'
+                            viz_path_platelets = 'viz_platelets_focus.png'
                             
                             viz_container.empty()  # Clear the progress message
                             
@@ -565,13 +574,13 @@ if st.button("Start Comprehensive Analysis", type="primary", key="analyze_button
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 if viz_path_all and os.path.exists(viz_path_all):
-                                    st.image(viz_path_all, caption=f"All Detected Cells ({total_detected} found)", use_column_width=True)
+                                    st.image(viz_path_all, caption=f"RBC Detection ({stats.get('RBC_count', 0)} found)", use_column_width=True)
                             with col2:
                                 if viz_path_wbc and os.path.exists(viz_path_wbc):
-                                    st.image(viz_path_wbc, caption="WBC Focus", use_column_width=True)
+                                    st.image(viz_path_wbc, caption=f"WBC Detection ({stats.get('WBC_count', 0)} found)", use_column_width=True)
                             with col3:
                                 if viz_path_platelets and os.path.exists(viz_path_platelets):
-                                    st.image(viz_path_platelets, caption="Platelets Focus", use_column_width=True)
+                                    st.image(viz_path_platelets, caption=f"Platelet Detection ({stats.get('Platelet_count', 0)} found)", use_column_width=True)
                             
                             st.success("✅ All cell visualizations generated successfully!")
                             
