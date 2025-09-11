@@ -381,10 +381,11 @@ class BloodCellAIAgent:
             raise ValueError("GROQ API key not found. Please set the GROQ_API_KEY environment variable.")
 
         models_to_try = [
-            "llama3-70b-8192",  # Primary model
-            "gemma2-9b-it",     # Secondary model
-            "mixtral-8x7b-32768",  # Fallback option 1
-            "llama3-8b-8192"    # Fallback option 2
+           
+             "llama-3.3-70b-versatile", # Secondary model
+            "gemma2-9b-it", 
+                    "llama-3.1-8b-instant"        # Fallback option 1
+         # Fallback option 2
         ]
         
         for model_name in models_to_try:
