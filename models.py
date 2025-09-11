@@ -411,9 +411,9 @@ def create_enhanced_detection(image_path):
             enhanced,
             cv2.HOUGH_GRADIENT,
             dp=1.2,
-            minDist=10,   # Further decreased min distance
+            minDist=8,   # Further decreased min distance
             param1=50,   # Relaxed edge threshold
-            param2=18,   # Further relaxed accumulator threshold
+            param2=15,   # Further relaxed accumulator threshold
             minRadius=8, # More realistic min radius
             maxRadius=35
         )
@@ -425,9 +425,9 @@ def create_enhanced_detection(image_path):
             blurred,
             cv2.HOUGH_GRADIENT,
             dp=1.5,
-            minDist=15,
+            minDist=12,
             param1=60,
-            param2=18,
+            param2=15,
             minRadius=10,
             maxRadius=32
         )
@@ -442,7 +442,7 @@ def create_enhanced_detection(image_path):
             for existing in unique_circles:
                 ex, ey, er = existing
                 distance = np.sqrt((x - ex)**2 + (y - ey)**2)
-                if distance < r * 0.8:  # Less aggressive overlap check
+                if distance < r * 0.9:  # Less aggressive overlap check
                     is_duplicate = True
                     break
             if not is_duplicate:
@@ -487,8 +487,8 @@ def create_enhanced_detection(image_path):
         
         # Approach 2: Color-based detection in HSV space
         # WBCs often have purple/blue nuclei - MORE SENSITIVE
-        lower_purple = np.array([100, 30, 30])
-        upper_purple = np.array([170, 255, 255])
+        lower_purple = np.array([90, 25, 25])
+        upper_purple = np.array([180, 255, 255])
         mask_purple = cv2.inRange(hsv, lower_purple, upper_purple)
         
         # Approach 3: LAB color space for better nucleus detection
@@ -511,7 +511,7 @@ def create_enhanced_detection(image_path):
         for contour in contours_wbc:
             area = cv2.contourArea(contour)
             # WBCs are typically larger than RBCs - AGGRESSIVE WIDENING
-            if 100 < area < 20000:
+            if 80 < area < 25000:
                 x, y, w, h = cv2.boundingRect(contour)
                 
                 # Check aspect ratio and solidity - VERY RELAXED CONSTRAINTS
@@ -520,7 +520,7 @@ def create_enhanced_detection(image_path):
                 hull_area = cv2.contourArea(hull)
                 solidity = area / hull_area if hull_area > 0 else 0
                 
-                if 0.3 <= aspect_ratio <= 3.0 and solidity > 0.4:
+                if 0.2 <= aspect_ratio <= 4.0 and solidity > 0.3:
                     conf = random.uniform(0.75, 0.98)
                     
                     cell_data = {
@@ -570,7 +570,7 @@ def create_enhanced_detection(image_path):
         for contour in contours_platelets:
             area = cv2.contourArea(contour)
             # Platelets are much smaller than other cells - AGGRESSIVE WIDENING
-            if 5 < area < 700:
+            if 3 < area < 800:
                 x, y, w, h = cv2.boundingRect(contour)
                 
                 # Check if it's not already detected as RBC or WBC
@@ -581,7 +581,7 @@ def create_enhanced_detection(image_path):
                 for existing_cell in all_detections['All_Cells']:
                     ex_center = existing_cell['center']
                     distance = np.sqrt((center_x - ex_center[0])**2 + (center_y - ex_center[1])**2)
-                    if distance < 8:  # Very close to existing detection
+                    if distance < 10:  # Very close to existing detection
                         is_duplicate = True
                         break
                 
