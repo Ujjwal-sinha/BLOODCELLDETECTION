@@ -14,6 +14,13 @@ from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+# Load environment variables
+load_dotenv()
+
+# Verify GROQ API key
+if not os.getenv("GROQ_API_KEY"):
+    raise ValueError("GROQ_API_KEY not found in environment variables. Please set it in your .env file.")
+
 # Set Streamlit page configuration
 st.set_page_config(
     page_title="AI-Powered Blood Cell Detection",

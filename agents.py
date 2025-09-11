@@ -114,7 +114,8 @@ BLOOD_CELL_KNOWLEDGE = {
 
 class BloodCellAnalysisTool(BaseTool):
     name: str = "blood_cell_analyzer"
-    description: str = "Analyze blood cell images for detection and morphology assessment"
+    description: str = "Analyze blood cell types and their characteristics"
+    return_direct: bool = True
     
     def _run(self, image_description: str, detected_cell: str, confidence: float) -> str:
         """Analyze blood cell image and provide detailed insights"""
@@ -348,7 +349,10 @@ class BloodCellAIAgent:
     """Main AI Agent for Blood Cell Detection and Analysis"""
     
     def __init__(self, api_key: str):
+        if not api_key:
+            raise ValueError("API key cannot be empty")
         self.api_key = api_key
+        print("Initializing LLM...")
         self.llm = self._get_working_llm()
         self.memory = ConversationBufferMemory(memory_key="chat_history")
         
@@ -360,23 +364,27 @@ class BloodCellAIAgent:
             BloodHealthRiskAssessorTool()
         ]
         
-        # Initialize agent
+        # Initialize agent with OpenAI functions agent which better handles multiple tools
         self.agent = initialize_agent(
             tools=self.tools,
             llm=self.llm,
-            agent="conversational-react-description",
+            agent="structured-chat-zero-shot-react-description",
             memory=self.memory,
             verbose=True,
-            handle_parsing_errors=True
+            handle_parsing_errors=True,
+            max_iterations=3
         )
     
     def _get_working_llm(self):
         """Get a working LLM instance with fallback models and retry logic."""
+        if not self.api_key:
+            raise ValueError("GROQ API key not found. Please set the GROQ_API_KEY environment variable.")
+
         models_to_try = [
-            "llama3-70b-8192",
-            "llama3-8b-8192",
-            "mixtral-8x7b-32768",
-            "gemma2-9b-it"
+            "llama3-70b-8192",  # Primary model
+            "gemma2-9b-it",     # Secondary model
+            "mixtral-8x7b-32768",  # Fallback option 1
+            "llama3-8b-8192"    # Fallback option 2
         ]
         
         for model_name in models_to_try:
