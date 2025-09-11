@@ -411,9 +411,9 @@ def create_enhanced_detection(image_path):
             enhanced,
             cv2.HOUGH_GRADIENT,
             dp=1.2,
-            minDist=12,   # Decreased min distance
+            minDist=10,   # Further decreased min distance
             param1=50,   # Relaxed edge threshold
-            param2=20,   # Relaxed accumulator threshold
+            param2=18,   # Further relaxed accumulator threshold
             minRadius=8, # More realistic min radius
             maxRadius=35
         )
@@ -425,9 +425,9 @@ def create_enhanced_detection(image_path):
             blurred,
             cv2.HOUGH_GRADIENT,
             dp=1.5,
-            minDist=20,
+            minDist=15,
             param1=60,
-            param2=20,
+            param2=18,
             minRadius=10,
             maxRadius=32
         )
@@ -442,7 +442,7 @@ def create_enhanced_detection(image_path):
             for existing in unique_circles:
                 ex, ey, er = existing
                 distance = np.sqrt((x - ex)**2 + (y - ey)**2)
-                if distance < (r + er) * 0.6:  # Less aggressive overlap check
+                if distance < r * 0.8:  # Less aggressive overlap check
                     is_duplicate = True
                     break
             if not is_duplicate:
