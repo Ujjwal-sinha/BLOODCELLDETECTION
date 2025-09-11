@@ -517,25 +517,26 @@ if uploaded_file is not None:
                             with col2:
                                 for viz_type, viz_path in saved_paths.items():
                                     with open(viz_path, 'rb') as f:
-                                    st.download_button(
+                                     st.download_button(
                                         label=f"📊 Download {viz_type.replace('_visualization', '')} Analysis",
                                         data=f,
                                         file_name=os.path.basename(viz_path),
                                         mime="image/png"
                                     )
-                        else:
-                            st.warning("Could not generate the analysis report. The detection results are still valid.")                            if report_data is not None:
-                              st.markdown("### Analysis Report")
-                                
-                                # Display report metrics
-                                metrics_col1, metrics_col2 = st.columns(2)
-                                
-                                with metrics_col1:
+                                else:
+                                 st.warning("Could not generate the analysis report. The detection results are still valid.")
+                if report_data is not None:
+                    st.markdown("### Analysis Report")
+
+                    # Display report metrics
+                    metrics_col1, metrics_col2 = st.columns(2)
+                
+                    with metrics_col1:
                                     st.image(report_data['visualization_paths']['distribution_pie'], 
                                            caption="Cell Type Distribution", 
                                            use_column_width=True)
                                 
-                                with metrics_col2:
+                    with metrics_col2:
                                     st.image(report_data['visualization_paths']['confidence_radar'], 
                                            caption="Detection Confidence by Cell Type", 
                                            use_column_width=True)
