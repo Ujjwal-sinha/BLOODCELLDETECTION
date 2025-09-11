@@ -83,6 +83,8 @@ if 'model_trained' not in st.session_state:
     st.session_state.model_trained = False
 if 'plot_paths' not in st.session_state:
     st.session_state.plot_paths = []
+if 'current_image' not in st.session_state:
+    st.session_state.current_image = None
 
 # Main header
 st.markdown("""
@@ -358,18 +360,19 @@ if uploaded_file is not None:
     try:
         # Display the uploaded image
         file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-        image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        st.session_state.current_image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         
-        if image is None:
+        if st.session_state.current_image is None or not isinstance(st.session_state.current_image, np.ndarray):
             st.error("Could not read the uploaded image. Please try a different file.")
+            st.session_state.current_image = None
         else:
             # Show the original image
-            st.image(image, caption="Uploaded Blood Smear Image", use_column_width=True)
+            st.image(st.session_state.current_image, caption="Uploaded Blood Smear Image", use_column_width=True)
             
             # Add a button to start analysis
             if st.button("Start Analysis"):
                 # Process the image and generate report
-                results = process_blood_cell_image(image)
+                results = process_blood_cell_image(st.session_state.current_image)
                 if not results:
                     st.error("Could not process the image. Please try a different image.")
                 else:
@@ -473,7 +476,7 @@ with col3:
 
 # Analyze button
 if st.button("Start Comprehensive Analysis", type="primary", key="analyze_button"):
-    if not image:
+    if st.session_state.current_image is None or not isinstance(st.session_state.current_image, np.ndarray) or st.session_state.current_image.size == 0:
         st.warning("Please upload a blood smear image before starting the analysis.")
         st.stop()
     
@@ -495,17 +498,17 @@ if st.button("Start Comprehensive Analysis", type="primary", key="analyze_button
     
     try:
         # Check image quality before proceeding
-        quality_score = check_image_quality(image)
+        quality_score = check_image_quality(st.session_state.current_image)
         
         # Describe the image using the BLIP model
         from utils import describe_image
-        image_description = describe_image(image) if processor and blip_model else "A blood smear image ready for analysis."
+        image_description = describe_image(st.session_state.current_image) if processor and blip_model else "A blood smear image ready for analysis."
         
         # Use the YOLO model for comprehensive blood cell detection
         if yolo_model is not None:
             # Save the image to a temporary file for processing
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
-                image.save(tmp_file.name)
+                cv2.imwrite(tmp_file.name, st.session_state.current_image)
                 
                 # Run comprehensive cell detection to find all cells
                 progress_container = st.empty()
@@ -549,7 +552,7 @@ if st.button("Start Comprehensive Analysis", type="primary", key="analyze_button
                     try:
                         # Save the current image to a temporary file for visualization
                         with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as viz_tmp_file:
-                            image.save(viz_tmp_file.name)
+                            cv2.imwrite(viz_tmp_file.name, st.session_state.current_image)
                             
                             # Generate three different visualizations
                             viz_path_all = visualize_all_cells(viz_tmp_file.name, detection_results, output_path='viz_all_cells.png')
@@ -585,7 +588,7 @@ if st.button("Start Comprehensive Analysis", type="primary", key="analyze_button
                     st.session_state.report_data = {
                         "analysis_type": "blood_cell_detection",
                         "report": report_text,
-                        "image": image,
+                        "image": st.session_state.current_image,
                         "image_description": image_description,
                         "quality_score": quality_score,
                         "detection_results": detection_results,
