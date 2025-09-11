@@ -19,35 +19,62 @@ from langchain_groq import ChatGroq
 from langchain.memory import ConversationBufferMemory
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import PromptTemplate
+from dotenv import load_dotenv
 
-def retry_with_exponential_backoff(func, max_retries=3, base_delay=1):
+# Load environment variables
+load_dotenv(override=True)
+
+# Configure model settings
+MODEL_NAME = "gemma2-9b-it"
+MODEL_TEMPERATURE = 0.1
+
+def retry_with_exponential_backoff(func, max_retries=5, base_delay=2, max_delay=30):
     """
-    Retry a function with exponential backoff.
+    Enhanced retry mechanism with exponential backoff and better error handling.
     
     Args:
         func: Function to retry
-        max_retries: Maximum number of retries
-        base_delay: Base delay in seconds
+        max_retries: Maximum number of retries (default: 5)
+        base_delay: Base delay in seconds (default: 2)
+        max_delay: Maximum delay between retries in seconds (default: 30)
     
     Returns:
         Result of the function call
     """
+    last_exception = None
+    
     for attempt in range(max_retries + 1):
         try:
             return func()
         except Exception as e:
+            last_exception = e
             error_msg = str(e).lower()
             
-            # If it's not a capacity issue, don't retry
-            if "over capacity" not in error_msg and "503" not in str(e):
+            # Define retryable errors
+            retryable_conditions = [
+                "over capacity",
+                "503",
+                "timeout",
+                "connection error",
+                "network",
+                "too many requests",
+                "temporary failure"
+            ]
+            
+            # Check if error is retryable
+            should_retry = any(condition in error_msg for condition in retryable_conditions)
+            
+            if not should_retry:
+                print(f"Non-retryable error: {error_msg}")
                 raise e
             
             if attempt == max_retries:
+                print(f"Max retries ({max_retries}) reached. Last error: {error_msg}")
                 raise e
             
             # Calculate delay with exponential backoff and jitter
-            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-            print(f"GROQ API over capacity, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries + 1})")
+            delay = min(base_delay * (2 ** attempt) + random.uniform(0, 2), max_delay)
+            print(f"Retry attempt {attempt + 1}/{max_retries + 1}. Waiting {delay:.2f} seconds...")
             time.sleep(delay)
 
 # Blood cell knowledge base
@@ -380,13 +407,7 @@ class BloodCellAIAgent:
         if not self.api_key:
             raise ValueError("GROQ API key not found. Please set the GROQ_API_KEY environment variable.")
 
-        models_to_try = [
-           
-             "llama-3.3-70b-versatile", # Secondary model
-            "gemma2-9b-it", 
-                    "llama-3.1-8b-instant"        # Fallback option 1
-         # Fallback option 2
-        ]
+        models_to_try = ["gemma2-9b-it"]  # Using only gemma2-9b-it model
         
         for model_name in models_to_try:
             try:
@@ -423,9 +444,32 @@ class BloodCellAIAgent:
                           confidences: List[float],
                           count_data: Dict,
                           morphology: str = "") -> Dict:
-        """Comprehensive blood sample analysis"""
+        """Comprehensive blood sample analysis with enhanced retry logic"""
         
-        # Create analysis prompt
+        # Ensure LLM is initialized
+        if self.llm is None:
+            try:
+                print("Initializing LLM...")
+                self._initialize_llm()
+                # Verify initialization
+                if not self.llm:
+                    raise Exception("LLM initialization failed - no model instance created")
+                # Test the model
+                test_response = self.llm.invoke("Test connection")
+                if not test_response:
+                    raise Exception("LLM initialization failed - no response from model")
+            except Exception as e:
+                print(f"LLM initialization failed: {str(e)}")
+                print("Please ensure GROQ_API_KEY is set correctly")
+                return {
+                    "error": "LLM initialization failed",
+                    "fallback_analysis": self._generate_fallback_analysis(
+                        detected_cells, confidences, count_data
+                    ),
+                    "timestamp": datetime.now().isoformat(),
+                    "status": "fallback"
+                }
+        
         prompt = f"""
         You are a world-class hematologist AI. Your task is to provide a detailed, professional, and insightful analysis of a blood smear image based on the provided data.
 
@@ -478,20 +522,73 @@ class BloodCellAIAgent:
         **--- END OF REPORT ---**
         """
         
-        try:
-            response = self.agent.run(prompt)
-            return {
-                "analysis": response,
-                "timestamp": datetime.now().isoformat(),
-                "agent_version": "1.0"
-            }
-        except Exception as e:
-            return {
-                "error": str(e),
-                "fallback_analysis": self._generate_fallback_analysis(
-                    detected_cells, confidences, count_data
+        def execute_analysis():
+            # Force LLM reinitialization
+            try:
+                self.llm = self._get_working_llm()
+                
+                # Generate a shorter, focused prompt first to test the LLM
+                test_prompt = "Provide a brief analysis of blood cell counts."
+                test_response = self.llm.invoke(test_prompt)
+                
+                if not test_response:
+                    raise Exception("LLM failed initial test")
+                
+                # If test passes, proceed with full analysis
+                response = self.llm.invoke(prompt)
+                
+                if not response or len(str(response).strip()) < 100:
+                    raise Exception("Generated analysis is too short")
+                
+                return response
+                
+            except Exception as e:
+                print(f"Analysis execution error: {str(e)}")
+                raise e
+
+        # Enhanced retry mechanism with progressive backoff
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                print(f"Attempting report generation (attempt {attempt + 1}/{max_attempts})")
+                
+                response = retry_with_exponential_backoff(
+                    execute_analysis,
+                    max_retries=2,
+                    base_delay=5,
+                    max_delay=20
                 )
-            }
+                
+                # Validate response
+                if response and len(str(response).strip()) > 200:  # Ensure meaningful content
+                    return {
+                        "analysis": response,
+                        "timestamp": datetime.now().isoformat(),
+                        "agent_version": "1.2",
+                        "status": "success",
+                        "attempt": attempt + 1
+                    }
+                else:
+                    raise Exception("Invalid response format")
+                    
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {str(e)}")
+                if attempt < max_attempts - 1:
+                    print(f"Waiting before next attempt...")
+                    time.sleep(10)  # Wait between major attempts
+                continue
+                
+        # If all attempts fail, return detailed fallback
+        print("All report generation attempts failed, using fallback analysis")
+        return {
+            "error": "Report generation failed after multiple attempts",
+            "fallback_analysis": self._generate_fallback_analysis(
+                detected_cells, confidences, count_data
+            ),
+            "timestamp": datetime.now().isoformat(),
+            "status": "fallback",
+            "attempts_made": max_attempts
+        }
     
     def _generate_fallback_analysis(self, cells: List[str], confidences: List[float], count_data: Dict) -> str:
         """Generate detailed fallback analysis when AI agent fails"""
@@ -572,7 +669,22 @@ class HematologyResearchAgent:
     
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.llm = self._get_working_llm()
+        self.llm = None
+        self._initialize_llm()
+    
+    def _initialize_llm(self):
+        """Initialize LLM with retries"""
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                self.llm = self._get_working_llm()
+                return
+            except Exception as e:
+                print(f"LLM initialization attempt {attempt + 1} failed: {str(e)}")
+                if attempt < max_attempts - 1:
+                    time.sleep(5)
+                else:
+                    raise
     
     def _get_working_llm(self):
         """Get a working LLM instance with fallback models and retry logic."""
