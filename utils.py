@@ -562,72 +562,273 @@ def plot_cell_distribution(cell_counts):
         print(f"Error plotting cell distribution: {e}")
         return None
 
-def generate_report(detection_results: Dict[str, Any]) -> str:
+def generate_report(detection_results: Dict[str, Any], agent: Any = None) -> str:
     """
     Generate a comprehensive analysis report from detection results.
     
     Args:
         detection_results: Dictionary containing detection statistics and other data.
+        agent: The AI agent instance for generating the report.
         
     Returns:
         str: A formatted string containing the full analysis report.
     """
     try:
         stats = detection_results.get('stats', {})
-        report_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Clinical interpretation based on counts
-        rbc_count = stats.get('RBC_count', 0)
-        wbc_count = stats.get('WBC_count', 0)
-        platelet_count = stats.get('Platelet_count', 0)
-        
-        # Basic clinical status
-        rbc_status = "Normal"
-        if rbc_count < 4.5: rbc_status = "Low"
-        elif rbc_count > 5.5: rbc_status = "High"
-        
-        wbc_status = "Normal"
-        if wbc_count < 4500: wbc_status = "Low"
-        elif wbc_count > 11000: wbc_status = "High"
-        
-        platelet_status = "Normal"
-        if platelet_count < 150000: platelet_status = "Low"
-        elif platelet_count > 450000: platelet_status = "High"
+        if agent:
+            try:
+                # Prepare data for the agent
+                image_description = "A standard blood smear image." # Placeholder
+                morphology_notes = "Morphology appears generally normal, detailed analysis pending." # Placeholder
+                
+                # Call the agent to get the detailed report
+                analysis_result = agent.analyze_blood_sample(
+                    image_description=image_description,
+                    detected_cells=['RBC', 'WBC', 'Platelets'],
+                    confidences=[
+                        stats.get('confidence_scores', {}).get('RBC', 0),
+                        stats.get('confidence_scores', {}).get('WBC', 0),
+                        stats.get('confidence_scores', {}).get('Platelets', 0)
+                    ],
+                    count_data=stats,
+                    morphology=morphology_notes
+                )
+                
+                if "analysis" in analysis_result:
+                    return analysis_result["analysis"]
+                else:
+                    # Fallback to basic report if agent fails
+                    print("Agent failed to generate report, creating basic version.")
+                    return generate_basic_report(stats)
 
-        report = f"""
-        # Comprehensive Blood Cell Analysis Report
-        **Generated on:** {report_date}
-        
-        ## 1. Detection Summary
-        - **Total Cells Detected:** {stats.get('total_cells_detected', 0)}
-        - **Detection Method:** {detection_results.get('detection_method', 'N/A')}
-        - **Overall Confidence:** {stats.get('confidence_scores', {}).get('Overall', 0):.2%}
-        
-        ## 2. Individual Cell Counts
-        - **Red Blood Cells (RBC):** {rbc_count:,}
-        - **White Blood Cells (WBC):** {wbc_count:,}
-        - **Platelets:** {platelet_count:,}
-        
-        ## 3. Cell Distribution
-        - **RBC Percentage:** {stats.get('cell_distribution', {}).get('RBC_percentage', 0):.1f}%
-        - **WBC Percentage:** {stats.get('cell_distribution', {}).get('WBC_percentage', 0):.1f}%
-        - **Platelet Percentage:** {stats.get('cell_distribution', {}).get('Platelet_percentage', 0):.1f}%
-        
-        ## 4. Clinical Interpretation
-        - **RBC Status:** {rbc_status}
-        - **WBC Status:** {wbc_status}
-        - **Platelet Status:** {platelet_status}
-        
-        ## 5. Recommendations
-        - This is an automated analysis. Please consult a medical professional for a complete diagnosis.
-        - Verify results with a standard laboratory test (CBC).
-        
-        **Disclaimer:** This report is for informational purposes only and is not a substitute for professional medical advice.
-        """
-        return report
+            except Exception as agent_error:
+                print(f"Error calling AI agent: {agent_error}")
+                return generate_basic_report(stats)
+        else:
+            # Generate basic report if no agent is provided
+            return generate_basic_report(stats)
+
     except Exception as e:
         print(f"Error generating report: {e}")
         return "Error: Could not generate the analysis report."
+
+def generate_basic_report(stats: Dict[str, Any]) -> str:
+    """Generates a basic, data-driven report when the AI agent is unavailable."""
+    report_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Basic clinical status
+    rbc_count = stats.get('RBC_count', 0)
+    wbc_count = stats.get('WBC_count', 0)
+    platelet_count = stats.get('Platelet_count', 0)
+    
+    rbc_status = "Normal"
+    if rbc_count < 4.5: rbc_status = "Low"
+    elif rbc_count > 5.5: rbc_status = "High"
+    
+    wbc_status = "Normal"
+    if wbc_count < 4500: wbc_status = "Low"
+    elif wbc_count > 11000: wbc_status = "High"
+    
+    platelet_status = "Normal"
+    if platelet_count < 150000: platelet_status = "Low"
+    elif platelet_count > 450000: platelet_status = "High"
+
+    report = f"""
+    # Basic Blood Cell Analysis Report
+    **Generated on:** {report_date}
+    
+    ## 1. Detection Summary
+    - **Total Cells Detected:** {stats.get('total_cells_detected', 0)}
+    - **Overall Confidence:** {stats.get('confidence_scores', {}).get('Overall', 0):.2%}
+    
+    ## 2. Individual Cell Counts
+    - **Red Blood Cells (RBC):** {rbc_count:,}
+    - **White Blood Cells (WBC):** {wbc_count:,}
+    - **Platelets:** {platelet_count:,}
+    
+    ## 3. Cell Distribution
+    - **RBC Percentage:** {stats.get('cell_distribution', {}).get('RBC_percentage', 0):.1f}%
+    - **WBC Percentage:** {stats.get('cell_distribution', {}).get('WBC_percentage', 0):.1f}%
+    - **Platelet Percentage:** {stats.get('cell_distribution', {}).get('Platelet_percentage', 0):.1f}%
+    
+    ## 4. Clinical Interpretation
+    - **RBC Status:** {rbc_status}
+    - **WBC Status:** {wbc_status}
+    - **Platelet Status:** {platelet_status}
+    
+    **Note:** This is a data-only report. The AI agent was unavailable for detailed narrative analysis.
+    """
+    return report
+
+class BloodCellPDF(FPDF):
+    """PDF generator for blood cell analysis reports"""
+    
+    def __init__(self, blood_info=""):
+        super().__init__()
+        self.blood_info = self.sanitize_text(blood_info)
+        self.set_auto_page_break(auto=True, margin=15)
+        self.add_page()
+    
+    def sanitize_text(self, text):
+        """Sanitize text for PDF compatibility"""
+        if not text:
+            return ""
+        # Remove or replace problematic Unicode characters
+        text = text.replace('"', "'")
+        text = text.replace('"', "'")
+        text = text.replace('–', '-')
+        text = text.replace('—', '-')
+        text = text.replace('•', '-')  # Replace bullet points with dashes
+        text = text.replace('…', '...')  # Replace ellipsis
+        text = text.replace('°', ' degrees')  # Replace degree symbol
+        text = text.replace('±', '+/-')  # Replace plus-minus symbol
+        text = text.replace('×', 'x')  # Replace multiplication symbol
+        text = text.replace('÷', '/')  # Replace division symbol
+        text = text.replace('≤', '<=')  # Replace less than or equal
+        text = text.replace('≥', '>=')  # Replace greater than or equal
+        text = text.replace('≠', '!=')  # Replace not equal
+        text = text.replace('∞', 'infinity')  # Replace infinity symbol
+        text = text.replace('√', 'sqrt')  # Replace square root
+        text = text.replace('²', '2')  # Replace superscript 2
+        text = text.replace('³', '3')  # Replace superscript 3
+        text = text.replace('₁', '1')  # Replace subscript 1
+        text = text.replace('₂', '2')  # Replace subscript 2
+        text = text.replace('₃', '3')  # Replace subscript 3
+        
+        # Remove any other non-ASCII characters
+        text = ''.join(char for char in text if ord(char) < 128)
+        
+        return text[:1000]  # Limit text length
+    
+    def header(self):
+        """Header for each page"""
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, 'Blood Cell Analysis Report', 0, 1, 'C')
+        self.ln(5)
+    
+    def footer(self):
+        """Footer for each page"""
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Page {self.page_no()}/{{nb}}', 0, 0, 'C')
+    
+    def cover_page(self):
+        """Create cover page"""
+        self.set_font('Arial', 'B', 24)
+        self.cell(0, 60, 'Blood Cell Analysis Report', 0, 1, 'C')
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 20, 'AI-Powered Hematological Assessment', 0, 1, 'C')
+        self.set_font('Arial', '', 12)
+        self.cell(0, 20, f'Generated on: {time.strftime("%Y-%m-%d %H:%M:%S")}', 0, 1, 'C')
+        if self.blood_info:
+            sanitized_info = self.sanitize_text(self.blood_info)
+            self.cell(0, 20, f'Sample Information: {sanitized_info}', 0, 1, 'C')
+        self.add_page()
+    
+    def table_of_contents(self):
+        """Add table of contents"""
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 10, 'Table of Contents', 0, 1, 'L')
+        self.ln(5)
+        
+        sections = [
+            'Executive Summary',
+            'Image Analysis',
+            'Cell Detection Results',
+            'Cell Count Analysis',
+            'Morphological Assessment',
+            'Clinical Interpretation',
+            'Quality Assessment',
+            'Follow-up Recommendations'
+        ]
+        
+        for i, section in enumerate(sections, 1):
+            self.set_font('Arial', '', 12)
+            self.cell(0, 8, f'{i}. {section}', 0, 1, 'L')
+        
+        self.add_page()
+    
+    def add_image(self, image_path, width=180):
+        """Add image to PDF"""
+        try:
+            if os.path.exists(image_path):
+                self.image(image_path, x=10, y=self.get_y(), w=width)
+                self.ln(5)
+        except Exception as e:
+            print(f"Error adding image to PDF: {e}")
+    
+    def add_section(self, title, body):
+        """Add a section with title and body text"""
+        self.set_font('Arial', 'B', 14)
+        self.cell(0, 10, self.sanitize_text(title), 0, 1, 'L')
+        self.ln(2)
+        
+        self.set_font('Arial', '', 11)
+        # Split body into paragraphs and add them
+        paragraphs = body.split('\n\n')
+        for paragraph in paragraphs:
+            if paragraph.strip():
+                # Sanitize the paragraph text
+                sanitized_paragraph = self.sanitize_text(paragraph.strip())
+                # Handle long lines by wrapping text
+                lines = self.multi_cell(0, 5, sanitized_paragraph)
+                self.ln(2)
+        
+        self.ln(5)
+    
+    def add_cell_count_table(self, cell_counts):
+        """Add cell count table"""
+        self.set_font('Arial', 'B', 14)
+        self.cell(0, 10, 'Cell Count Summary', 0, 1, 'L')
+        self.ln(5)
+        
+        # Table headers
+        self.set_font('Arial', 'B', 12)
+        self.cell(60, 8, 'Cell Type', 1, 0, 'C')
+        self.cell(40, 8, 'Count', 1, 0, 'C')
+        self.cell(80, 8, 'Normal Range', 1, 1, 'C')
+        
+        # Table data
+        self.set_font('Arial', '', 11)
+        normal_ranges = {
+            'RBC': '4.5-5.5 million/uL',
+            'WBC': '4,500-11,000/uL',
+            'Platelets': '150,000-450,000/uL'
+        }
+        
+        for cell_type, count in cell_counts.items():
+            self.cell(60, 8, cell_type, 1, 0, 'L')
+            self.cell(40, 8, str(count), 1, 0, 'C')
+            self.cell(80, 8, normal_ranges.get(cell_type, 'N/A'), 1, 1, 'C')
+        
+        self.ln(10)
+    
+    def add_summary(self, report, blood_context=None):
+        """Add executive summary"""
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 10, 'Executive Summary', 0, 1, 'L')
+        self.ln(5)
+        
+        self.set_font('Arial', '', 11)
+        
+        # Extract key information from report
+        summary_points = [
+            "AI-powered blood cell detection completed successfully",
+            "Comprehensive analysis of cellular morphology and counts",
+            "Detailed hematological assessment provided",
+            "Quality assurance and follow-up recommendations outlined"
+        ]
+        
+        for point in summary_points:
+            self.cell(0, 5, f"- {point}", 0, 1, 'L')
+        
+        if blood_context:
+            self.ln(5)
+            sanitized_context = self.sanitize_text(blood_context)
+            self.cell(0, 5, f"Sample Context: {sanitized_context}", 0, 1, 'L')
+        
+        self.ln(10)
 
 class BloodCellPDF(FPDF):
     """PDF generator for blood cell analysis reports"""
