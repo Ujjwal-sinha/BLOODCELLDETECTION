@@ -494,21 +494,78 @@ class BloodCellAIAgent:
             }
     
     def _generate_fallback_analysis(self, cells: List[str], confidences: List[float], count_data: Dict) -> str:
-        """Generate fallback analysis when agent fails"""
-        return f"""
-        **Fallback Blood Sample Analysis**
-        
-        Detected Cells: {', '.join(cells)}
-        Average Confidence: {sum(confidences)/len(confidences):.2f}
-        
-        **Recommendations:**
-        1. Verify cell counts with manual analysis
-        2. Check for morphological abnormalities
-        3. Consider additional blood tests if needed
-        4. Consult with hematologist for detailed interpretation
-        
-        **Note:** This is an automated preliminary analysis. Professional laboratory verification is required.
-        """
+        """Generate detailed fallback analysis when AI agent fails"""
+        try:
+            # Calculate basic statistics
+            avg_confidence = sum(confidences)/len(confidences) if confidences else 0
+            cell_counts = {}
+            for cell in cells:
+                cell_counts[cell] = cell_counts.get(cell, 0) + 1
+
+            # Generate detailed fallback report
+            report = f"""
+            **AUTOMATED BLOOD SAMPLE ANALYSIS REPORT**
+            
+            **1. DETECTION SUMMARY:**
+            - Total Cells Detected: {len(cells)}
+            - Detection Confidence: {avg_confidence:.2f}
+            - Cell Type Distribution: {', '.join(f'{k}: {v}' for k, v in cell_counts.items())}
+            
+            **2. QUANTITATIVE ANALYSIS:**
+            """
+            
+            # Add count data if available
+            if count_data:
+                report += "\nCell Counts:\n"
+                for cell_type, count in count_data.items():
+                    if isinstance(count, (int, float)):
+                        report += f"- {cell_type}: {count:,}\n"
+
+                # Add shape analysis if available
+                if 'shape_analysis' in count_data:
+                    report += "\nMorphological Indicators:\n"
+                    for cell_type, metrics in count_data['shape_analysis'].items():
+                        report += f"- {cell_type.upper()}:\n"
+                        for metric, value in metrics.items():
+                            report += f"  • {metric}: {value:.3f}\n"
+
+            report += """
+            **3. RECOMMENDATIONS:**
+            1. Conduct manual verification of cell counts
+            2. Perform detailed morphological examination
+            3. Consider additional confirmatory tests
+            4. Schedule follow-up with hematology specialist
+            5. Document any clinical symptoms for correlation
+            
+            **4. LIMITATIONS:**
+            - This is an automated preliminary analysis
+            - AI-assisted report generation was unavailable
+            - Professional laboratory verification is required
+            - Results should be interpreted in clinical context
+            
+            **5. NEXT STEPS:**
+            1. Complete blood count (CBC) with differential
+            2. Manual microscopic examination
+            3. Clinical correlation with patient symptoms
+            4. Consider specialized hematological tests based on findings
+            
+            **Note:** This is a fallback analysis generated due to AI service unavailability. 
+            Please ensure professional medical interpretation of these results.
+            """
+            
+            return report
+            
+        except Exception as e:
+            # Ultimate fallback if even basic analysis fails
+            return f"""
+            **Basic Analysis Summary**
+            
+            Detected Cells: {', '.join(cells) if cells else 'None'}
+            Status: Limited analysis available
+            
+            Note: Full analysis unavailable. Please consult laboratory professional.
+            Error details: {str(e)}
+            """
 
 class HematologyResearchAgent:
     """Research Assistant for Hematology Literature"""
@@ -519,41 +576,52 @@ class HematologyResearchAgent:
     
     def _get_working_llm(self):
         """Get a working LLM instance with fallback models and retry logic."""
+        if not self.api_key:
+            raise Exception("GROQ API key not found. Please set the GROQ_API_KEY environment variable.")
+
         models_to_try = [
-            "llama3-70b-8192",
-            "llama3-8b-8192",
-            "mixtral-8x7b-32768",
-            "gemma2-9b-it"
+            "llama3-70b-8192",  # Primary model
+            "mixtral-8x7b-32768",  # First fallback
+            "gemma2-9b-it",  # Second fallback
+            "llama3-8b-8192"  # Last resort
         ]
         
+        last_error = None
         for model_name in models_to_try:
             try:
                 def test_model():
                     llm = ChatGroq(
                         model=model_name,
                         temperature=0.1,
-                        groq_api_key=self.api_key
+                        groq_api_key=self.api_key,
+                        request_timeout=30  # Add timeout
                     )
-                    # Test the model with a simple prompt
-                    test_response = llm.invoke("Test")
-                    if test_response:
+                    # Test with a simple system-check prompt
+                    test_response = llm.invoke("Perform a simple system check.")
+                    if test_response and len(str(test_response).strip()) > 0:
+                        print(f"Successfully initialized model: {model_name}")
                         return llm
-                    else:
-                        raise Exception("Empty response from model")
+                    raise Exception("Empty response from model")
                 
                 # Use retry mechanism for this model
-                return retry_with_exponential_backoff(test_model)
+                return retry_with_exponential_backoff(test_model, max_retries=3, base_delay=2)
                 
             except Exception as e:
+                last_error = e
                 error_msg = str(e).lower()
-                if "over capacity" in error_msg or "503" in str(e):
-                    continue
+                print(f"Error with model {model_name}: {error_msg}")
+                
+                if any(msg in error_msg for msg in ["over capacity", "503", "timeout", "network"]):
+                    continue  # Try next model for capacity/network issues
+                elif "api key" in error_msg:
+                    raise Exception("Invalid GROQ API key") from e
                 else:
-                    # For other errors, try next model
-                    continue
+                    continue  # Try next model for other errors
         
-        # If all models fail, raise an exception
-        raise Exception("All GROQ models are currently unavailable")
+        # If all models fail, provide detailed error
+        error_msg = f"All GROQ models are currently unavailable. Last error: {str(last_error)}"
+        print(error_msg)  # Log the error
+        raise Exception(error_msg)
     
     def search_hematology_literature(self, condition: str) -> str:
         """Search hematology literature for blood conditions"""
