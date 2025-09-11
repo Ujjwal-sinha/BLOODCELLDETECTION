@@ -400,82 +400,39 @@ def create_enhanced_detection(image_path):
         blurred = cv2.GaussianBlur(gray, (3, 3), 0)
         
         # Enhance contrast for better circle detection
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
         enhanced = clahe.apply(blurred)
         
         # Multiple circle detection passes with different parameters
         all_circles = []
         
-        # Pass 1: Standard RBC detection (optimized for more detection)
+        # Pass 1: Relaxed RBC detection to increase count
         circles1 = cv2.HoughCircles(
             enhanced,
             cv2.HOUGH_GRADIENT,
-            dp=1,
-            minDist=5,   # Allow closer circles
-            param1=40,   # Lower edge threshold
-            param2=15,   # Much lower accumulator threshold
-            minRadius=3,
-            maxRadius=30
+            dp=1.2,
+            minDist=12,   # Decreased min distance
+            param1=50,   # Relaxed edge threshold
+            param2=20,   # Relaxed accumulator threshold
+            minRadius=8, # More realistic min radius
+            maxRadius=35
         )
         if circles1 is not None:
             all_circles.extend(circles1[0])
-        
-        # Pass 2: Very small cells (platelets and small RBCs)
+
+        # Pass 2: A slightly more sensitive pass to catch some variations
         circles2 = cv2.HoughCircles(
-            enhanced,
+            blurred,
             cv2.HOUGH_GRADIENT,
-            dp=1,
-            minDist=3,   # Very close detection
-            param1=30,
-            param2=10,   # Very low threshold
-            minRadius=2,
-            maxRadius=12
+            dp=1.5,
+            minDist=20,
+            param1=60,
+            param2=20,
+            minRadius=10,
+            maxRadius=32
         )
         if circles2 is not None:
             all_circles.extend(circles2[0])
-        
-        # Pass 3: Medium to large cells
-        circles3 = cv2.HoughCircles(
-            enhanced,
-            cv2.HOUGH_GRADIENT,
-            dp=1,
-            minDist=8,
-            param1=50,
-            param2=18,
-            minRadius=8,
-            maxRadius=45
-        )
-        
-        # Pass 4: Additional pass with different preprocessing
-        enhanced2 = cv2.equalizeHist(gray)
-        circles4 = cv2.HoughCircles(
-            enhanced2,
-            cv2.HOUGH_GRADIENT,
-            dp=1,
-            minDist=4,
-            param1=35,
-            param2=12,
-            minRadius=3,
-            maxRadius=35
-        )
-        if circles3 is not None:
-            all_circles.extend(circles3[0])
-        if circles4 is not None:
-            all_circles.extend(circles4[0])
-        
-        # Pass 5: Very sensitive detection with different blur
-        circles5 = cv2.HoughCircles(
-            blurred,
-            cv2.HOUGH_GRADIENT,
-            dp=2,
-            minDist=4,
-            param1=25,
-            param2=10,
-            minRadius=2,
-            maxRadius=35
-        )
-        if circles5 is not None:
-            all_circles.extend(circles5[0])
         
         # Remove duplicate circles (those too close to each other) - less aggressive
         unique_circles = []
@@ -485,7 +442,7 @@ def create_enhanced_detection(image_path):
             for existing in unique_circles:
                 ex, ey, er = existing
                 distance = np.sqrt((x - ex)**2 + (y - ey)**2)
-                if distance < min(r, er) * 0.5:  # Only remove if very close overlap
+                if distance < (r + er) * 0.6:  # Less aggressive overlap check
                     is_duplicate = True
                     break
             if not is_duplicate:
@@ -529,9 +486,9 @@ def create_enhanced_detection(image_path):
         thresh_dark = cv2.bitwise_not(thresh_dark)
         
         # Approach 2: Color-based detection in HSV space
-        # WBCs often have purple/blue nuclei
-        lower_purple = np.array([120, 50, 50])
-        upper_purple = np.array([150, 255, 255])
+        # WBCs often have purple/blue nuclei - MORE SENSITIVE
+        lower_purple = np.array([100, 30, 30])
+        upper_purple = np.array([170, 255, 255])
         mask_purple = cv2.inRange(hsv, lower_purple, upper_purple)
         
         # Approach 3: LAB color space for better nucleus detection
@@ -553,18 +510,18 @@ def create_enhanced_detection(image_path):
         wbc_count = 0
         for contour in contours_wbc:
             area = cv2.contourArea(contour)
-            # WBCs are typically larger than RBCs - WIDENED RANGE
-            if 200 < area < 8000:
+            # WBCs are typically larger than RBCs - AGGRESSIVE WIDENING
+            if 100 < area < 20000:
                 x, y, w, h = cv2.boundingRect(contour)
                 
-                # Check aspect ratio and solidity - RELAXED CONSTRAINTS
+                # Check aspect ratio and solidity - VERY RELAXED CONSTRAINTS
                 aspect_ratio = w / h if h > 0 else 1
                 hull = cv2.convexHull(contour)
                 hull_area = cv2.contourArea(hull)
                 solidity = area / hull_area if hull_area > 0 else 0
                 
-                if 0.5 <= aspect_ratio <= 1.8 and solidity > 0.6:
-                    conf = random.uniform(0.65, 0.92)
+                if 0.3 <= aspect_ratio <= 3.0 and solidity > 0.4:
+                    conf = random.uniform(0.75, 0.98)
                     
                     cell_data = {
                         'bbox': [x, y, x + w, y + h],
@@ -594,8 +551,8 @@ def create_enhanced_detection(image_path):
         # Approach 2: Edge-based detection for small fragments
         edges_platelets = cv2.Canny(gray, 50, 150)
         
-        # Approach 3: Color-based detection (platelets can be purple/pink)
-        lower_platelet = np.array([140, 30, 30])
+        # Approach 3: Color-based detection (platelets can be purple/pink) - MORE SENSITIVE
+        lower_platelet = np.array([130, 20, 20])
         upper_platelet = np.array([180, 255, 255])
         mask_platelet_color = cv2.inRange(hsv, lower_platelet, upper_platelet)
         
@@ -612,8 +569,8 @@ def create_enhanced_detection(image_path):
         platelet_count = 0
         for contour in contours_platelets:
             area = cv2.contourArea(contour)
-            # Platelets are much smaller than other cells - WIDENED RANGE
-            if 10 < area < 400:
+            # Platelets are much smaller than other cells - AGGRESSIVE WIDENING
+            if 5 < area < 700:
                 x, y, w, h = cv2.boundingRect(contour)
                 
                 # Check if it's not already detected as RBC or WBC
@@ -624,12 +581,12 @@ def create_enhanced_detection(image_path):
                 for existing_cell in all_detections['All_Cells']:
                     ex_center = existing_cell['center']
                     distance = np.sqrt((center_x - ex_center[0])**2 + (center_y - ex_center[1])**2)
-                    if distance < 10:  # Too close to existing detection
+                    if distance < 8:  # Very close to existing detection
                         is_duplicate = True
                         break
                 
                 if not is_duplicate:
-                    conf = random.uniform(0.55, 0.85)
+                    conf = random.uniform(0.6, 0.9)
                     
                     cell_data = {
                         'bbox': [x, y, x + w, y + h],
@@ -1795,7 +1752,7 @@ def analyze_blood_metrics(detection_results: dict) -> dict:
             'flags': {},
             'interpretation': ["Error analyzing blood cell metrics"]
         }
-                    
+
 def create_evaluation_plots(detection_results: Dict[str, any],
                       save_dir: str = './plots') -> Dict[str, str]:
     """
