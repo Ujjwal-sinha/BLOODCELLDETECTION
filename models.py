@@ -69,17 +69,25 @@ def create_cell_specific_visualizations(image: np.ndarray, detections: Dict) -> 
         
         # Define colors for visualization
         colors = {
-            'RBC': (0, 255, 0),      # Green
+            'RBC': (0, 255, 0, 180),  # Green with some transparency
             'WBC': (255, 0, 0),      # Red
             'Platelets': (0, 0, 255)  # Blue
         }
         
+        # Create a transparent overlay for RBCs
+        overlay = rbc_image.copy()
+
         # Draw RBCs
         for det in detections['detections']['RBC']:
             x1, y1, x2, y2 = det['bbox']
-            cv2.rectangle(rbc_image, (x1, y1), (x2, y2), colors['RBC'], 2)
+            # Draw a filled rectangle on the overlay
+            cv2.rectangle(overlay, (x1, y1), (x2, y2), colors['RBC'][:3], -1)
             cv2.putText(rbc_image, f"RBC {det['confidence']:.2f}", 
-                       (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors['RBC'], 2)
+                       (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2) # Black text for visibility
+        
+        # Blend the overlay with the original image
+        alpha = 0.4 # Transparency factor
+        cv2.addWeighted(overlay, alpha, rbc_image, 1 - alpha, 0, rbc_image)
         
         # Draw WBCs
         for det in detections['detections']['WBC']:
@@ -545,17 +553,17 @@ def create_enhanced_detection(image_path):
         wbc_count = 0
         for contour in contours_wbc:
             area = cv2.contourArea(contour)
-            # WBCs are typically larger than RBCs
-            if 300 < area < 5000:
+            # WBCs are typically larger than RBCs - WIDENED RANGE
+            if 200 < area < 8000:
                 x, y, w, h = cv2.boundingRect(contour)
                 
-                # Check aspect ratio and solidity
+                # Check aspect ratio and solidity - RELAXED CONSTRAINTS
                 aspect_ratio = w / h if h > 0 else 1
                 hull = cv2.convexHull(contour)
                 hull_area = cv2.contourArea(hull)
                 solidity = area / hull_area if hull_area > 0 else 0
                 
-                if 0.6 <= aspect_ratio <= 1.5 and solidity > 0.7:
+                if 0.5 <= aspect_ratio <= 1.8 and solidity > 0.6:
                     conf = random.uniform(0.65, 0.92)
                     
                     cell_data = {
@@ -604,19 +612,19 @@ def create_enhanced_detection(image_path):
         platelet_count = 0
         for contour in contours_platelets:
             area = cv2.contourArea(contour)
-            # Platelets are much smaller than other cells
-            if 20 < area < 300:
+            # Platelets are much smaller than other cells - WIDENED RANGE
+            if 10 < area < 400:
                 x, y, w, h = cv2.boundingRect(contour)
                 
                 # Check if it's not already detected as RBC or WBC
                 center_x, center_y = x + w//2, y + h//2
                 is_duplicate = False
                 
-                # Check against existing detections
+                # Check against existing detections - REDUCED DISTANCE
                 for existing_cell in all_detections['All_Cells']:
                     ex_center = existing_cell['center']
                     distance = np.sqrt((center_x - ex_center[0])**2 + (center_y - ex_center[1])**2)
-                    if distance < 15:  # Too close to existing detection
+                    if distance < 10:  # Too close to existing detection
                         is_duplicate = True
                         break
                 

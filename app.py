@@ -515,8 +515,8 @@ if st.button("Start Comprehensive Analysis", type="primary", key="analyze_button
                 progress_container.info("🔍 Running comprehensive blood cell detection with maximum sensitivity...")
                 
                 try:
-                    # Use a higher confidence threshold to reduce RBCs and focus on WBC/Platelets
-                    detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.1)
+                    # Use a very low confidence threshold to maximize initial YOLO detections
+                    detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.01)
                     progress_container.empty()  # Clear the progress message
                 except Exception as detection_error:
                     progress_container.error(f"An error occurred during detection: {str(detection_error)}")
