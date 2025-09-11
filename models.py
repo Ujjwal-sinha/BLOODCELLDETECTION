@@ -69,8 +69,8 @@ def create_cell_specific_visualizations(image: np.ndarray, detections: Dict) -> 
         
         # Define colors for visualization
         colors = {
-            'RBC': (255, 0, 0),      # Red
-            'WBC': (0, 255, 0),      # Green
+            'RBC': (0, 255, 0),      # Green
+            'WBC': (255, 0, 0),      # Red
             'Platelets': (0, 0, 255)  # Blue
         }
         
@@ -134,20 +134,34 @@ def enhance_cell_detection(image: np.ndarray) -> Dict:
             'All_Cells': []
         }
         
-        # Detect WBCs (typically larger and more intensely stained)
-        # WBCs usually appear purple/dark blue in Wright's stain
-        lower_wbc = np.array([100, 50, 50])
-        upper_wbc = np.array([140, 255, 255])
-        wbc_mask = cv2.inRange(hsv, lower_wbc, upper_wbc)
+        # Detect WBCs with enhanced sensitivity (multiple color ranges to catch more WBCs)
+        wbc_ranges = [
+            (np.array([100, 30, 30]), np.array([140, 255, 255])),  # Purple/dark blue
+            (np.array([80, 30, 30]), np.array([100, 255, 255])),   # Additional blue range
+            (np.array([140, 30, 30]), np.array([160, 255, 255]))   # Additional purple range
+        ]
+        wbc_mask = np.zeros_like(hsv[:,:,0])
+        for lower, upper in wbc_ranges:
+            wbc_mask = cv2.bitwise_or(wbc_mask, cv2.inRange(hsv, lower, upper))
+        wbc_mask = cv2.morphologyEx(wbc_mask, cv2.MORPH_OPEN, np.ones((3,3), np.uint8))
         wbc_contours, _ = cv2.findContours(wbc_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         # Detect RBCs (pink/red colored cells)
-        lower_rbc = np.array([160, 50, 50])
+        lower_rbc = np.array([160, 30, 30])
         upper_rbc = np.array([180, 255, 255])
         rbc_mask = cv2.inRange(hsv, lower_rbc, upper_rbc)
+        rbc_mask = cv2.morphologyEx(rbc_mask, cv2.MORPH_OPEN, np.ones((3,3), np.uint8))
         rbc_contours, _ = cv2.findContours(rbc_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        # Detect Platelets (small purple dots)
+        # Detect Platelets with enhanced sensitivity (multiple color ranges and size filtering)
+        platelet_ranges = [
+            (np.array([130, 30, 30]), np.array([150, 255, 255])),  # Purple range
+            (np.array([100, 30, 30]), np.array([130, 255, 255]))   # Additional blue-purple range
+        ]
+        platelet_mask = np.zeros_like(hsv[:,:,0])
+        for lower, upper in platelet_ranges:
+            platelet_mask = cv2.bitwise_or(platelet_mask, cv2.inRange(hsv, lower, upper))
+        platelet_mask = cv2.morphologyEx(platelet_mask, cv2.MORPH_OPEN, np.ones((2,2), np.uint8))  # Smaller kernel for platelets
         # Convert to grayscale for platelet detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
