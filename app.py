@@ -542,16 +542,17 @@ if uploaded_file is not None:
                                            use_column_width=True)
                                 
                                 # Display detailed metrics
-                                st.markdown("#### Detailed Cell Counts")
-                                st.image(report_data['visualization_paths']['metrics_bar'], 
+                    st.markdown("#### Detailed Cell Counts")
+                    st.image(report_data['visualization_paths']['metrics_bar'], 
                                        caption="Cell Counts by Type", 
                                        use_column_width=True)
                                 
                                 # Add download buttons for report and visualizations
-                            st.markdown("### Download Results")
-                            col1, col2, col3 = st.columns(3)
+                    st.markdown("### Download Results")
+
+                    col1, col2, col3 = st.columns(3)
                             
-                            with col1:
+                    with col1:
                                 with open(report_data['report_path'], 'rb') as f:
                                     st.download_button(
                                         label="Download Detailed Report",
@@ -560,8 +561,8 @@ if uploaded_file is not None:
                                         mime="text/plain"
                                     )
                             
-                            with col2:
-                                for viz_path in saved_paths.values():
+                                with col2:
+                                   for viz_path in saved_paths.values():
                                     with open(viz_path, 'rb') as f:
                                         st.download_button(
                                             label=f"Download {os.path.basename(viz_path)}",
