@@ -1,20 +1,20 @@
 Blood Cell Detection Report
-        Generated on: 2025-09-11 16:52:37
+        Generated on: 2025-09-11 16:58:30
         
         Summary:
-        - Total Cells Detected: 41
-        - RBC Count: 30
-        - WBC Count: 11
+        - Total Cells Detected: 24
+        - RBC Count: 18
+        - WBC Count: 6
         - Platelet Count: 0
         
         Cell Distribution:
-        - RBC: 73.17%
-        - WBC: 26.83%
+        - RBC: 75.00%
+        - WBC: 25.00%
         - Platelets: 0.00%
         
         Confidence Scores:
-        - RBC: 0.596
-        - WBC: 0.820
+        - RBC: 0.459
+        - WBC: 0.721
         - Platelets: 0.000
-        - Overall: 0.656
+        - Overall: 0.524
         
