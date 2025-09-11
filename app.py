@@ -266,80 +266,266 @@ with st.sidebar:
 st.markdown("""
 <div class="hero-gradient">
     <div style="text-align: center; color: #2d3748;">
-        <div style="font-size: 2rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center;">📁</div>
+        <div style="font-size: 2rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center;">�</div>
         <h2 style="font-family: 'Inter', sans-serif; margin-bottom: 0.3rem; font-size: 1.8rem; font-weight: 700; color: #2d3748;">
             Blood Cell Analysis
         </h2>
         <p style="font-size: 1rem; margin: 0; color: #4a5568; font-weight: 500;">
-            AI-Powered Analysis • Image Upload • Blood Cell Detection
+            AI-Powered Analysis • Detailed Cell Detection • Advanced Reporting
         </p>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # Image input and analysis section
-col1, col2 = st.columns([3, 2])
-
-with col1:
-    st.markdown("""
-    <div class="compact-card">
-        <div style="text-align: center; margin-bottom: 1rem;">
-            <div style="font-size: 1.5rem; margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: center;">📁</div>
-            <h4 style="color: #2d3748; margin: 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.1rem;">Upload Blood Smear Image</h4>
-            <p style="color: #4a5568; margin: 0.3rem 0 0 0; font-size: 0.85rem; font-weight: 500;">Upload a blood smear image for detailed cell analysis</p>
-        </div>
+st.markdown("""
+<div class="upload-section" style="max-width: 800px; margin: 2rem auto; padding: 2rem; background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%); border-radius: 1rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="font-size: 2rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">�</div>
+        <h3 style="color: #2d3748; margin: 0 0 0.5rem 0; font-weight: 700; font-family: 'Inter', sans-serif;">Upload Blood Smear Image</h3>
+        <p style="color: #4a5568; margin: 0; font-size: 0.9rem;">Select a blood smear image for detailed cell analysis</p>
     </div>
-    """, unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
     
-    uploaded_file = st.file_uploader("Choose a blood smear image...", type=["jpg", "jpeg", "png"])
-    if uploaded_file is not None:
-        try:
-            # Read and process the image
-            file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-            image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+# Main file uploader section with improved styling
+st.markdown("""
+<div class="uploader-container" style="margin: 2rem auto; text-align: center;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 2rem; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 1rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+        <div style="font-size: 1.5rem; margin-bottom: 1rem;">🔬</div>
+        <h3 style="color: #2d3748; margin-bottom: 1rem; font-weight: 600;">Blood Cell Analysis</h3>
+        <p style="color: #4a5568; margin-bottom: 1.5rem;">Upload a blood smear image for detailed analysis</p>
+        <div style="font-size: 0.875rem; color: #718096;">Supported formats: JPG, JPEG, PNG (Max 200MB)</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# File uploader
+uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
+
+def process_blood_cell_image(image):
+    """Process blood cell image and return detection results."""
+    try:
+        # Create three columns for different cell type visualizations
+        st.markdown("### Cell Type Detection Results")
+        viz_col1, viz_col2, viz_col3 = st.columns(3)
+        
+        with st.spinner("Analyzing blood cells..."):
+            # Perform enhanced detection
+            detections = enhance_cell_detection(image)
+            if not detections:
+                st.error("Could not detect cells in the image. Please try a different image.")
+                return
             
-            if image is not None:
-                # Create three columns for different cell type visualizations
-                st.markdown("### Cell Type Detection Results")
-                viz_col1, viz_col2, viz_col3 = st.columns(3)
+            # Generate cell-specific visualizations
+            visualizations = create_cell_specific_visualizations(image, detections)
+            if not visualizations:
+                st.error("Could not generate cell visualizations.")
+                return
+            
+            # Save visualizations
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            saved_paths = save_cell_specific_images(visualizations, f"detection_{timestamp}")
+            
+            # Display cell-specific images
+            with viz_col1:
+                st.markdown("#### RBC Detection")
+                st.image(visualizations['RBC_visualization'], 
+                        caption=f"RBCs Detected: {detections['stats']['RBC_count']}", 
+                        use_column_width=True)
+            
+            with viz_col2:
+                st.markdown("#### WBC Detection")
+                st.image(visualizations['WBC_visualization'], 
+                        caption=f"WBCs Detected: {detections['stats']['WBC_count']}", 
+                        use_column_width=True)
+            
+            with viz_col3:
+                st.markdown("#### Platelet Detection")
+                st.image(visualizations['Platelet_visualization'], 
+                        caption=f"Platelets Detected: {detections['stats']['Platelet_count']}", 
+                        use_column_width=True)
+            
+            return detections, saved_paths
+            
+    except Exception as e:
+        st.error(f"Error during analysis: {str(e)}")
+        return None
+
+# Process uploaded file
+if uploaded_file is not None:
+    try:
+        # Read the image
+        file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+        image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        
+        if image is None:
+            st.error("Could not read the uploaded image. Please try a different file.")
+        else:
+            # Process the image and generate report
+            results = process_blood_cell_image(image)
+            if not results:
+                st.error("Could not process the image. Please try a different image.")
+            else:
+                detections, saved_paths = results
                 
-                with st.spinner("Analyzing blood cells..."):
-                    # Perform enhanced detection
-                    detections = enhance_cell_detection(image)
+                # Generate report
+                report_data = generate_advanced_report(detections, uploaded_file.name)
+                if not report_data:
+                    st.warning("Could not generate the analysis report. The detection results are still valid.")
+                else:
+                    # Display report
+                    st.markdown("### Analysis Report")
                     
-                    if detections is not None:
-                        # Generate cell-specific visualizations
-                        visualizations = create_cell_specific_visualizations(image, detections)
+                    # Display metrics in columns
+                    metrics_col1, metrics_col2 = st.columns(2)
+                    
+                    with metrics_col1:
+                        st.image(report_data['visualization_paths']['distribution_pie'], 
+                               caption="Cell Type Distribution", 
+                               use_column_width=True)
+                    
+                    with metrics_col2:
+                        st.image(report_data['visualization_paths']['confidence_radar'], 
+                               caption="Detection Confidence by Cell Type", 
+                               use_column_width=True)
+                    
+                    # Display detailed metrics
+                    st.markdown("#### Detailed Cell Counts")
+                    st.image(report_data['visualization_paths']['metrics_bar'], 
+                            caption="Cell Counts by Type", 
+                            use_column_width=True)
+                    
+                    # Add download section
+                    st.markdown("### Download Results")
+                    dl_col1, dl_col2 = st.columns(2)
+                    
+                    with dl_col1:
+                        with open(report_data['report_path'], 'rb') as f:
+                            report_bytes = f.read()
+                        st.download_button(
+                            label="📄 Download Detailed Report",
+                            data=report_bytes,
+                            file_name="blood_cell_analysis_report.txt",
+                            mime="text/plain"
+                        )
+                    
+                    with dl_col2:
+                        for viz_type, viz_path in saved_paths.items():
+                            with open(viz_path, 'rb') as f:
+                                img_bytes = f.read()
+                            st.download_button(
+                                label=f"📊 Download {viz_type.replace('_visualization', '')} Analysis",
+                                data=img_bytes,
+                                file_name=os.path.basename(viz_path),
+                                mime="image/png"
+                            )
+                
+                # Process the image
+                results = process_blood_cell_image(image)
+                if results:
+                    detections, saved_paths = results
+                    
+                    # Generate and display report
+                    report_data = generate_advanced_report(detections, uploaded_file.name)
+                    if report_data:
+                        st.markdown("### Analysis Report")
                         
-                        if visualizations is not None:
-                            # Save visualizations
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            saved_paths = save_cell_specific_images(visualizations, f"detection_{timestamp}")
+                        # Display metrics
+                        metrics_col1, metrics_col2 = st.columns(2)
+                        
+                        with metrics_col1:
+                            st.image(report_data['visualization_paths']['distribution_pie'], 
+                                   caption="Cell Type Distribution", 
+                                   use_column_width=True)
+                        
+                        with metrics_col2:
+                            st.image(report_data['visualization_paths']['confidence_radar'], 
+                                   caption="Detection Confidence by Cell Type", 
+                                   use_column_width=True)
+                        
+                        # Display detailed metrics
+                        st.markdown("#### Detailed Cell Counts")
+                        st.image(report_data['visualization_paths']['metrics_bar'], 
+                               caption="Cell Counts by Type", 
+                               use_column_width=True)
+                        
+                        # Add download section
+                        st.markdown("### Download Results")
+                        dl_col1, dl_col2 = st.columns(2)
+                        
+                        with dl_col1:
+                            with open(report_data['report_path'], 'rb') as f:
+                                report_bytes = f.read()
+                            st.download_button(
+                                label="📄 Download Detailed Report",
+                                data=report_bytes,
+                                file_name="blood_cell_analysis_report.txt",
+                                mime="text/plain"
+                            )
+                    
+                    with dl_col2:
+                        for viz_type, viz_path in saved_paths.items():
+                            with open(viz_path, 'rb') as f:
+                                img_bytes = f.read()
+                            st.download_button(
+                                label=f"📊 Download {viz_type.replace('_visualization', '')} Analysis",
+                                data=img_bytes,
+                                file_name=os.path.basename(viz_path),
+                                mime="image/png"
+                            )
+                else:
+                    st.warning("Could not generate the analysis report. The detection results are still valid.")
+                        
+                        # Generate and display advanced report
+                report_data = generate_advanced_report(detections, uploaded_file.name)
+                if report_data:
+                            st.markdown("### Analysis Report")
                             
-                            # Display cell-specific images
-                            with viz_col1:
-                                st.markdown("#### RBC Detection")
-                                st.image(visualizations['RBC_visualization'], 
-                                       caption=f"RBCs Detected: {detections['stats']['RBC_count']}", 
+                            # Display report metrics
+                            metrics_col1, metrics_col2 = st.columns(2)
+                            
+                            with metrics_col1:
+                                st.image(report_data['visualization_paths']['distribution_pie'], 
+                                       caption="Cell Type Distribution", 
                                        use_column_width=True)
                             
-                            with viz_col2:
-                                st.markdown("#### WBC Detection")
-                                st.image(visualizations['WBC_visualization'], 
-                                       caption=f"WBCs Detected: {detections['stats']['WBC_count']}", 
+                            with metrics_col2:
+                                st.image(report_data['visualization_paths']['confidence_radar'], 
+                                       caption="Detection Confidence by Cell Type", 
                                        use_column_width=True)
                             
-                            with viz_col3:
-                                st.markdown("#### Platelet Detection")
-                                st.image(visualizations['Platelet_visualization'], 
-                                       caption=f"Platelets Detected: {detections['stats']['Platelet_count']}", 
-                                       use_column_width=True)
+                            # Display detailed metrics
+                            st.markdown("#### Detailed Cell Counts")
+                            st.image(report_data['visualization_paths']['metrics_bar'], 
+                                   caption="Cell Counts by Type", 
+                                   use_column_width=True)
                             
-                            # Generate advanced report
-                            report_data = generate_advanced_report(detections, uploaded_file.name)
+                            # Add download buttons
+                            st.markdown("### Download Results")
+                            col1, col2 = st.columns(2)
                             
-                            if report_data is not None:
-                                st.markdown("### Analysis Report")
+                            with col1:
+                                with open(report_data['report_path'], 'rb') as f:
+                                    st.download_button(
+                                        label="📄 Download Detailed Report",
+                                        data=f,
+                                        file_name="blood_cell_analysis_report.txt",
+                                        mime="text/plain"
+                                    )
+                            
+                            with col2:
+                                for viz_type, viz_path in saved_paths.items():
+                                    with open(viz_path, 'rb') as f:
+                                    st.download_button(
+                                        label=f"📊 Download {viz_type.replace('_visualization', '')} Analysis",
+                                        data=f,
+                                        file_name=os.path.basename(viz_path),
+                                        mime="image/png"
+                                    )
+                        else:
+                            st.warning("Could not generate the analysis report. The detection results are still valid.")                            if report_data is not None:
+                              st.markdown("### Analysis Report")
                                 
                                 # Display report metrics
                                 metrics_col1, metrics_col2 = st.columns(2)
@@ -361,102 +547,44 @@ with col1:
                                        use_column_width=True)
                                 
                                 # Add download buttons for report and visualizations
-                                st.markdown("### Download Results")
-                                col1, col2, col3 = st.columns(3)
-                                
-                                with col1:
-                                    with open(report_data['report_path'], 'rb') as f:
+                            st.markdown("### Download Results")
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                with open(report_data['report_path'], 'rb') as f:
+                                    st.download_button(
+                                        label="Download Detailed Report",
+                                        data=f,
+                                        file_name="blood_cell_analysis_report.txt",
+                                        mime="text/plain"
+                                    )
+                            
+                            with col2:
+                                for viz_path in saved_paths.values():
+                                    with open(viz_path, 'rb') as f:
                                         st.download_button(
-                                            label="Download Detailed Report",
+                                            label=f"Download {os.path.basename(viz_path)}",
                                             data=f,
-                                            file_name="blood_cell_analysis_report.txt",
-                                            mime="text/plain"
+                                            file_name=os.path.basename(viz_path),
+                                            mime="image/png"
                                         )
-                                
-                                with col2:
-                                    for viz_path in saved_paths.values():
-                                        with open(viz_path, 'rb') as f:
-                                            st.download_button(
-                                                label=f"Download {os.path.basename(viz_path)}",
-                                                data=f,
-                                                file_name=os.path.basename(viz_path),
-                                                mime="image/png"
-                                            )
-                        else:
-                            st.error("Error generating visualizations")
-                    else:
-                        st.error("Error during cell detection")
-            else:
-                st.error("Error reading the uploaded image")
-                
-        except Exception as e:
+                else:
+                    st.error("Error generating visualizations")
+                    
+    except Exception as e:
+        st.error(f"Error processing image: {str(e)}")
+        if debug_mode:
+            st.exception(e)
             st.error(f"Error processing image: {str(e)}")
             if debug_mode:
                 st.exception(e)
     
-    image = None
-    
-    # Enhanced file uploader
-    st.markdown("""
-    <div class="compact-card" style="border: 2px dashed #48bb78; background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%); padding: 2rem;">
-        <div style="text-align: center;">
-            <div style="background: linear-gradient(135deg, #48bb78, #38a169); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 6px 20px rgba(72, 187, 120, 0.3);">
-                <span style="font-size: 2rem; color: white; display: flex; align-items: center; justify-content: center;">📁</span>
-            </div>
-            <h5 style="color: #2d3748; margin-bottom: 0.5rem; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.2rem;">Upload Blood Smear Image</h5>
-            <p style="color: #4a5568; font-size: 0.9rem; margin-bottom: 1rem; font-family: 'Inter', sans-serif; font-weight: 500;">Select a blood smear image from your device for analysis.</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    img_file = st.file_uploader(
-        "Choose a file",
-        type=['png', 'jpg', 'jpeg'],
-        help="Upload a blood smear image for comprehensive cell analysis",
-        label_visibility="collapsed"
-    )
-    
-    if img_file:
-        try:
-            image = Image.open(img_file).convert('RGB')
-            st.success("✅ Image uploaded successfully and is ready for analysis!")
-        except Exception as e:
-            st.error(f"❌ Error uploading image: {e}")
+    except Exception as e:
+        st.error(f"Error processing image: {str(e)}")
+        if debug_mode:
+            st.exception(e)
 
-with col2:
-    if image:
-        st.markdown("""
-        <div class="compact-card" style="padding: 1.5rem;">
-            <div style="text-align: center; margin-bottom: 1rem;">
-                <div style="font-size: 2rem; margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: center;">📷</div>
-                <h4 style="color: #2d3748; margin: 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.2rem;">Image Preview</h4>
-                <p style="color: #4a5568; margin: 0.3rem 0 0 0; font-size: 0.9rem; font-family: 'Inter', sans-serif; font-weight: 500;">Your image is ready for analysis.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.image(image, caption="Uploaded Blood Smear Image", use_column_width=True)
-        
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); padding: 1.5rem; border-radius: 15px; margin: 1.5rem 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); border: none;">
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔬</div>
-                <h4 style="color: #ffffff; margin: 0 0 0.5rem 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.3rem;">Ready for Analysis</h4>
-                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 1rem; font-family: 'Inter', sans-serif;">The uploaded blood smear image is ready for comprehensive cell analysis.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    else:
-        st.markdown("""
-        <div class="compact-card" style="border: 2px dashed #cbd5e0; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 3rem 1.5rem; text-align: center;">
-            <div style="background: linear-gradient(135deg, #e2e8f0, #cbd5e0); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto; box-shadow: 0 6px 20px rgba(160, 174, 192, 0.3);">
-                <span style="font-size: 2rem; color: #a0aec0;">🩺</span>
-            </div>
-            <h4 style="color: #4a5568; margin-bottom: 0.5rem; font-weight: 700; font-size: 1.1rem; font-family: 'Inter', sans-serif;">No Image Selected</h4>
-            <p style="color: #718096; font-size: 0.9rem; margin: 0; font-family: 'Inter', sans-serif;">Please upload an image to see the preview.</p>
-        </div>
-        """, unsafe_allow_html=True)
+
 
 # Analysis options
 st.markdown("""
