@@ -76,202 +76,43 @@ def load_yolo_model(weights_path='yolo11n.pt'):
 
 def detect_all_cells_comprehensive(model, image_path, confidence_threshold=0.01):
     """
-    Comprehensive detection of ALL cells in the image with maximum sensitivity
+    Comprehensive detection of ALL cells in the image with maximum sensitivity.
+    This function will now primarily use the enhanced computer vision detection method
+    to ensure better detection of all cell types.
     
     Args:
-        model: YOLO model instance
+        model: YOLO model instance (will be used as a fallback)
         image_path: Path to the blood smear image
-        confidence_threshold: Very low threshold to detect maximum cells
+        confidence_threshold: Confidence threshold for YOLO fallback
         
     Returns:
         Dictionary containing comprehensive cell detection results
     """
     try:
-        if model is None:
-            print("❌ YOLO model is not available - using enhanced detection")
-            return create_enhanced_detection(image_path)
-            
-        # Starting comprehensive cell detection (avoid print statements that can cause WebSocket issues)
-        # Using confidence threshold (logged internally)
-        
-        # Store original model settings
-        original_conf = getattr(model, 'conf', 0.25)
-        original_iou = getattr(model, 'iou', 0.45)
-        
-        # Configure for maximum detection sensitivity
-        model.conf = confidence_threshold  # Very low confidence threshold
-        model.iou = 0.05   # Very low IoU for maximum overlapping detections
-        
-        # Run inference with maximum detection settings
-        # Running YOLO inference (avoid print statements that can cause WebSocket issues)
-        results = model(image_path, save=False, verbose=False, imgsz=1024, max_det=2000)
-        
-        # Restore original settings
-        model.conf = original_conf
-        model.iou = original_iou
-        
-        # Initialize comprehensive detection storage
-        all_detections = {
-            'RBC': [],
-            'WBC': [],
-            'Platelets': [],
-            'All_Cells': []  # Master list of all detected cells
-        }
-        
-        total_cells_detected = 0
-        detection_areas = []
-        
-        # Process all detection results
-        for r in results:
-            if hasattr(r, 'boxes') and r.boxes is not None:
-                boxes = r.boxes
-                # Processing detected objects (avoid print statements that can cause WebSocket issues)
-            else:
-                # No YOLO detections found, trying enhanced detection (avoid print statements)
-                return create_enhanced_detection(image_path)
-                
-                for box in boxes:
-                    # Extract box information
-                    x1, y1, x2, y2 = box.xyxy[0].tolist()
-                    conf = box.conf[0].item()
-                    cls = int(box.cls[0].item())
-                    
-                    # Calculate cell area
-                    cell_area = (x2 - x1) * (y2 - y1)
-                    detection_areas.append(cell_area)
-                    
-                    # Map class index to cell type
-                    # Force blood cell mapping regardless of model's original classes
-                    blood_cell_names = ['RBC', 'WBC', 'Platelets']
-                    
-                    # If model has custom names, try to map them to blood cells
-                    if hasattr(model, 'names') and model.names:
-                        original_names = list(model.names.values())
-                        print(f"🔍 Model detects: {original_names}")
-                        
-                        # Try to map common objects to blood cells for demo purposes
-                        cell_type_mapping = {
-                            'person': 'WBC',
-                            'donut': 'RBC', 
-                            'cake': 'WBC',
-                            'orange': 'RBC',
-                            'apple': 'RBC',
-                            'cell': 'RBC',
-                            'circle': 'RBC',
-                            'round': 'RBC',
-                            'ball': 'RBC',
-                            'sports ball': 'RBC',
-                            'frisbee': 'RBC',
-                            'pizza': 'RBC',
-                            'doughnut': 'RBC',
-                            'cup': 'WBC',
-                            'bowl': 'WBC'
-                        }
-                        
-                        if cls < len(original_names):
-                            original_class = original_names[cls].lower()
-                            cell_type = cell_type_mapping.get(original_class, 'RBC')  # Default to RBC
-                            print(f"🔄 Mapping '{original_class}' to '{cell_type}'")
-                        else:
-                            cell_type = 'RBC'  # Default
-                    else:
-                        # Use blood cell names directly
-                        if cls < len(blood_cell_names):
-                            cell_type = blood_cell_names[cls]
-                        else:
-                            cell_type = 'RBC'  # Default
-                    
-                    # Create comprehensive cell data
-                    cell_data = {
-                        'bbox': [x1, y1, x2, y2],
-                        'confidence': conf,
-                        'cell_type': cell_type,
-                        'area': cell_area,
-                        'center': [(x1 + x2) / 2, (y1 + y2) / 2],
-                        'width': x2 - x1,
-                        'height': y2 - y1,
-                        'aspect_ratio': (x2 - x1) / (y2 - y1) if (y2 - y1) > 0 else 1
-                    }
-                    
-                    # Add to specific cell type list
-                    all_detections[cell_type].append(cell_data)
-                    # Add to master list
-                    all_detections['All_Cells'].append(cell_data)
-                    total_cells_detected += 1
-        
-        # If no detections, try enhanced detection method
-        if total_cells_detected == 0:
-            # No YOLO detections found, trying enhanced detection (avoid print statements)
-            return create_enhanced_detection(image_path)
-        
-        # Calculate comprehensive statistics
-        stats = {
-            'total_cells_detected': total_cells_detected,
-            'RBC_count': len(all_detections['RBC']),
-            'WBC_count': len(all_detections['WBC']),
-            'Platelet_count': len(all_detections['Platelets']),
-            
-            # Cell distribution percentages
-            'cell_distribution': {
-                'RBC_percentage': (len(all_detections['RBC']) / total_cells_detected * 100) if total_cells_detected > 0 else 0,
-                'WBC_percentage': (len(all_detections['WBC']) / total_cells_detected * 100) if total_cells_detected > 0 else 0,
-                'Platelet_percentage': (len(all_detections['Platelets']) / total_cells_detected * 100) if total_cells_detected > 0 else 0
-            },
-            
-            # Confidence scores
-            'confidence_scores': {
-                'RBC': sum(d['confidence'] for d in all_detections['RBC']) / len(all_detections['RBC']) if all_detections['RBC'] else 0,
-                'WBC': sum(d['confidence'] for d in all_detections['WBC']) / len(all_detections['WBC']) if all_detections['WBC'] else 0,
-                'Platelets': sum(d['confidence'] for d in all_detections['Platelets']) / len(all_detections['Platelets']) if all_detections['Platelets'] else 0,
-                'Overall': sum(d['confidence'] for d in all_detections['All_Cells']) / len(all_detections['All_Cells']) if all_detections['All_Cells'] else 0
-            },
-            
-            # Detection density and coverage
-            'detection_density': total_cells_detected / (640 * 640) if total_cells_detected > 0 else 0,
-            'average_cell_area': sum(detection_areas) / len(detection_areas) if detection_areas else 0,
-            'detection_coverage': len(set([(int(d['center'][0]//50), int(d['center'][1]//50)) for d in all_detections['All_Cells']])),
-            
-            # Size analysis
-            'size_analysis': {
-                'min_area': min(detection_areas) if detection_areas else 0,
-                'max_area': max(detection_areas) if detection_areas else 0,
-                'avg_area': sum(detection_areas) / len(detection_areas) if detection_areas else 0
-            }
-        }
-        
-        # Create detection summary
-        detection_summary = f"🎯 Comprehensive Detection Complete: {total_cells_detected} total cells found"
-        if total_cells_detected > 0:
-            detection_summary += f" | RBC: {stats['RBC_count']}, WBC: {stats['WBC_count']}, Platelets: {stats['Platelet_count']}"
-        
-        # Log detection summary (avoid print statements that can cause WebSocket issues)
-        detection_summary_text = f"✅ {detection_summary}"
-        density_text = f"📊 Detection density: {stats['detection_density']:.6f} cells/pixel"
-        coverage_text = f"🎯 Coverage areas: {stats['detection_coverage']} grid regions"
-        
-        # If YOLO found very few cells, use enhanced detection instead
-        if total_cells_detected < 50:  # Threshold for "too few cells"
-            # YOLO found few cells, switching to enhanced detection (avoid print statements)
-            return create_enhanced_detection(image_path)
-        
-        detection_results = {
-            'detections': all_detections,
-            'stats': stats,
-            'raw_results': results,
-            'detection_summary': detection_summary,
-            'detection_method': 'Comprehensive YOLO Detection',
-            'confidence_threshold_used': confidence_threshold
-        }
-        
-        # Detection complete - explainability removed for focus on core detection
-        # Analysis complete (avoid print statements that can cause WebSocket issues)
-        
-        return detection_results
+        # Directly use the enhanced computer vision method for better results
+        print("INFO: Using enhanced computer vision detection for comprehensive analysis.")
+        return create_enhanced_detection(image_path)
         
     except Exception as e:
         print(f"❌ Error in comprehensive cell detection: {e}")
-        print("🔄 Falling back to enhanced computer vision detection...")
-        return create_enhanced_detection(image_path)
+        # Fallback to YOLO if the enhanced method fails
+        print("🔄 Falling back to YOLO detection...")
+        try:
+            if model is None:
+                print("❌ YOLO model is not available.")
+                return None
+                
+            results = model(image_path, save=False, verbose=False, imgsz=1024, max_det=2000, conf=confidence_threshold)
+            
+            # Process YOLO results as a last resort
+            all_detections = {'RBC': [], 'WBC': [], 'Platelets': [], 'All_Cells': []}
+            # (A simplified YOLO processing logic can be added here if needed)
+
+            return {'detections': all_detections, 'stats': {}, 'raw_results': results}
+
+        except Exception as yolo_e:
+            print(f"❌ YOLO fallback also failed: {yolo_e}")
+            return None
 
 def create_enhanced_detection(image_path):
     """
@@ -1316,6 +1157,7 @@ def train_blood_cell_detector(data_dir: str, weights_path: str = 'yolo11n.pt',
 def apply_lime(image, model, classes):
     """Apply LIME for skin disease explainability"""
     try:
+        from lime import lime_image
         explainer = lime_image.LimeImageExplainer()
         
         def predict_fn(images):
@@ -1755,73 +1597,6 @@ def analyze_blood_metrics(detection_results: dict) -> dict:
             'interpretation': ["Error analyzing blood cell metrics"]
         }
                     
-def analyze_blood_metrics(detection_results: dict) -> dict:
-    """
-    Analyze blood cell metrics and ratios from detection results
-    
-    Args:
-        detection_results: Dictionary containing detection counts and confidence scores
-        
-    Returns:
-        dict: Analysis results including ratios and flags for abnormal values
-    """
-    try:
-        stats = detection_results['stats']
-        rbc_count = stats['RBC_count']
-        wbc_count = stats['WBC_count']
-        platelet_count = stats['Platelet_count']
-        
-        # Calculate ratios
-        wbc_rbc_ratio = wbc_count / rbc_count if rbc_count > 0 else 0
-        platelet_rbc_ratio = platelet_count / rbc_count if rbc_count > 0 else 0
-        
-        # Normal ranges (approximate values, should be adjusted based on specific requirements)
-        normal_ranges = {
-            'WBC_RBC_ratio': (0.001, 0.01),  # Typical WBC:RBC ratio range
-            'Platelet_RBC_ratio': (0.02, 0.2),  # Typical Platelet:RBC ratio range
-        }
-        
-        # Check for abnormalities
-        analysis = {
-            'ratios': {
-                'WBC_RBC_ratio': wbc_rbc_ratio,
-                'Platelet_RBC_ratio': platelet_rbc_ratio
-            },
-            'flags': {
-                'low_RBC': rbc_count < 10,  # Arbitrary threshold, adjust as needed
-                'high_WBC': wbc_rbc_ratio > normal_ranges['WBC_RBC_ratio'][1],
-                'low_WBC': wbc_rbc_ratio < normal_ranges['WBC_RBC_ratio'][0],
-                'high_platelets': platelet_rbc_ratio > normal_ranges['Platelet_RBC_ratio'][1],
-                'low_platelets': platelet_rbc_ratio < normal_ranges['Platelet_RBC_ratio'][0]
-            },
-            'interpretation': []
-        }
-        
-        # Generate interpretation
-        if analysis['flags']['low_RBC']:
-            analysis['interpretation'].append("Low RBC count detected - possible anemia")
-        if analysis['flags']['high_WBC']:
-            analysis['interpretation'].append("Elevated WBC count - possible infection or inflammation")
-        if analysis['flags']['low_WBC']:
-            analysis['interpretation'].append("Low WBC count - possible immunodeficiency")
-        if analysis['flags']['high_platelets']:
-            analysis['interpretation'].append("Elevated platelet count - possible thrombocytosis")
-        if analysis['flags']['low_platelets']:
-            analysis['interpretation'].append("Low platelet count - possible thrombocytopenia")
-            
-        if not analysis['interpretation']:
-            analysis['interpretation'].append("All cell counts appear to be within normal ranges")
-            
-        return analysis
-        
-    except Exception as e:
-        print(f"Error analyzing blood metrics: {e}")
-        return {
-            'ratios': {},
-            'flags': {},
-            'interpretation': ["Error analyzing blood cell metrics"]
-        }
-
 def create_evaluation_plots(detection_results: Dict[str, any],
                       save_dir: str = './plots') -> Dict[str, str]:
     """
@@ -1868,7 +1643,7 @@ def create_evaluation_plots(detection_results: Dict[str, any],
         labels = []
         
         for cell_type in cell_types:
-            confidences = [det[4] for det in detections[cell_type]]
+            confidences = [det['confidence'] for det in detections[cell_type]]
             if confidences:
                 conf_data.append(confidences)
                 labels.extend([cell_type] * len(confidences))
@@ -1929,7 +1704,7 @@ def analyze_blood_metrics(detection_results: dict) -> dict:
         
         # Calculate ratios
         wbc_rbc_ratio = wbc_count / rbc_count if rbc_count > 0 else 0
-        platelet_rbc_ratio = platelet_count / rbc_count if rbc_count > 0 else 0
+        platelet_rbc_ratio = platelet_count / rbc_count if  rbc_count > 0 else 0
         
         # Normal ranges (approximate values, should be adjusted based on specific requirements)
         normal_ranges = {

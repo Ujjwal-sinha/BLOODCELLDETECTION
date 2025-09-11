@@ -276,43 +276,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Blood Cell Information Section
-st.markdown("""
-<div style="background: rgba(255, 255, 255, 0.9); padding: 1.5rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-    <h3 style="color: #2d3748; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-        Blood Cell Information
-    </h3>
-    <p style="color: #4a5568; margin-bottom: 1rem;">Learn about different blood cell types and their functions</p>
-</div>
-""", unsafe_allow_html=True)
-
-# Blood cell information
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("""
-    <div style="background: rgba(239, 83, 80, 0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #ef5350;">
-        <strong style="color: #2d3748;">Red Blood Cells (RBC)</strong><br>
-        <span style="color: #4a5568; font-size: 0.9rem;">Function: Oxygen transport<br>Normal Count: 4.5-5.5 million/μL</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col2:
-    st.markdown("""
-    <div style="background: rgba(66, 165, 245, 0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #42a5f5;">
-        <strong style="color: #2d3748;">White Blood Cells (WBC)</strong><br>
-        <span style="color: #4a5568; font-size: 0.9rem;">Function: Immune defense<br>Normal Count: 4,500-11,000/μL</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col3:
-    st.markdown("""
-    <div style="background: rgba(102, 187, 106, 0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #66bb6a;">
-        <strong style="color: #2d3748;">Platelets</strong><br>
-        <span style="color: #4a5568; font-size: 0.9rem;">Function: Blood clotting<br>Normal Count: 150,000-450,000/μL</span>
-    </div>
-    """, unsafe_allow_html=True)
-
 # Image input section
 col1, col2 = st.columns([3, 2])
 
@@ -329,15 +292,15 @@ with col1:
     
     image = None
     
-    # Only upload image option
+    # Enhanced file uploader
     st.markdown("""
-    <div class="compact-card" style="border: 2px dashed #48bb78; background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%);">
+    <div class="compact-card" style="border: 2px dashed #48bb78; background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%); padding: 2rem;">
         <div style="text-align: center;">
-            <div style="background: linear-gradient(135deg, #48bb78, #38a169); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 6px 20px rgba(72, 187, 120, 0.3);">
-                <span style="font-size: 1.5rem; color: white; display: flex; align-items: center; justify-content: center;">📁</span>
+            <div style="background: linear-gradient(135deg, #48bb78, #38a169); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 6px 20px rgba(72, 187, 120, 0.3);">
+                <span style="font-size: 2rem; color: white; display: flex; align-items: center; justify-content: center;">📁</span>
             </div>
-            <h5 style="color: #2d3748; margin-bottom: 0.5rem; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.1rem;">Upload Blood Smear Image</h5>
-            <p style="color: #4a5568; font-size: 0.9rem; margin-bottom: 1rem; font-family: 'Inter', sans-serif; font-weight: 500;">Select a blood smear image from your device</p>
+            <h5 style="color: #2d3748; margin-bottom: 0.5rem; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.2rem;">Upload Blood Smear Image</h5>
+            <p style="color: #4a5568; font-size: 0.9rem; margin-bottom: 1rem; font-family: 'Inter', sans-serif; font-weight: 500;">Select a blood smear image from your device for analysis.</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -345,37 +308,37 @@ with col1:
     img_file = st.file_uploader(
         "Choose a file",
         type=['png', 'jpg', 'jpeg'],
-        help="Upload a blood smear image for cell analysis",
+        help="Upload a blood smear image for comprehensive cell analysis",
         label_visibility="collapsed"
     )
     
     if img_file:
         try:
             image = Image.open(img_file).convert('RGB')
-            st.success("✅ Image uploaded successfully!")
+            st.success("✅ Image uploaded successfully and is ready for analysis!")
         except Exception as e:
-            st.error(f"❌ Upload error: {e}")
+            st.error(f"❌ Error uploading image: {e}")
 
 with col2:
     if image:
         st.markdown("""
-        <div class="compact-card">
+        <div class="compact-card" style="padding: 1.5rem;">
             <div style="text-align: center; margin-bottom: 1rem;">
-                <div style="font-size: 1.5rem; margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: center;">📷</div>
-                <h4 style="color: #2d3748; margin: 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.1rem;">Image Preview</h4>
-                <p style="color: #4a5568; margin: 0.3rem 0 0 0; font-size: 0.85rem; font-family: 'Inter', sans-serif; font-weight: 500;">Ready for analysis</p>
+                <div style="font-size: 2rem; margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: center;">📷</div>
+                <h4 style="color: #2d3748; margin: 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.2rem;">Image Preview</h4>
+                <p style="color: #4a5568; margin: 0.3rem 0 0 0; font-size: 0.9rem; font-family: 'Inter', sans-serif; font-weight: 500;">Your image is ready for analysis.</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.image(image, caption="Blood Smear Image", use_column_width=True)
+        st.image(image, caption="Uploaded Blood Smear Image", use_column_width=True)
         
         st.markdown("""
         <div style="background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); padding: 1.5rem; border-radius: 15px; margin: 1.5rem 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); border: none;">
             <div style="text-align: center;">
-                <div style="font-size: 2rem; margin-bottom: 0.5rem;">📷</div>
-                <h4 style="color: #ffffff; margin: 0 0 0.5rem 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.3rem;">Image Ready for Analysis</h4>
-                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 1rem; font-family: 'Inter', sans-serif;">Your blood smear image is ready for comprehensive cell analysis.</p>
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔬</div>
+                <h4 style="color: #ffffff; margin: 0 0 0.5rem 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.3rem;">Ready for Analysis</h4>
+                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 1rem; font-family: 'Inter', sans-serif;">The uploaded blood smear image is ready for comprehensive cell analysis.</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -387,18 +350,18 @@ with col2:
                 <span style="font-size: 2rem; color: #a0aec0;">🩺</span>
             </div>
             <h4 style="color: #4a5568; margin-bottom: 0.5rem; font-weight: 700; font-size: 1.1rem; font-family: 'Inter', sans-serif;">No Image Selected</h4>
-            <p style="color: #718096; font-size: 0.9rem; margin: 0; font-family: 'Inter', sans-serif;">Upload an image to see preview</p>
+            <p style="color: #718096; font-size: 0.9rem; margin: 0; font-family: 'Inter', sans-serif;">Please upload an image to see the preview.</p>
         </div>
         """, unsafe_allow_html=True)
 
 # Analysis options
 st.markdown("""
-<div class="glass-effect">
-    <h3 style="color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.3rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-        <span style="font-size: 1.5rem;">📋</span>
+<div class="glass-effect" style="padding: 1.5rem;">
+    <h3 style="color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.4rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+        <span style="font-size: 1.8rem;">📋</span>
         <span>Select Analysis Type</span>
     </h3>
-    <p style="color: #4a5568; text-align: center; margin-bottom: 1rem; font-size: 0.95rem; font-weight: 500;">Choose one or more analysis types below, then click "Analyze" to proceed</p>
+    <p style="color: #4a5568; text-align: center; margin-bottom: 1.5rem; font-size: 1rem; font-weight: 500;">Choose one or more analysis types, then click "Analyze" to proceed.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -407,28 +370,31 @@ col1, col2, col3 = st.columns(3)
 with col1:
     cell_detection = st.checkbox(
         "Blood Cell Detection",
-        help="Detect and count blood cells (RBC, WBC, Platelets)",
+        value=True,  # Default to selected
+        help="Detect and count all blood cells (RBC, WBC, Platelets).",
         key="detection_checkbox"
     )
 
 with col2:
     morphology_analysis = st.checkbox(
         "Cell Morphology Analysis",
-        help="Analyze cell shape, size, and characteristics",
+        value=True,  # Default to selected
+        help="Analyze cell shape, size, and other characteristics.",
         key="morphology_checkbox"
     )
 
 with col3:
     complete_analysis = st.checkbox(
         "Complete Blood Analysis",
-        help="Full blood cell detection and morphology assessment",
+        value=True,  # Default to selected
+        help="Perform a full blood cell detection and morphology assessment.",
         key="complete_checkbox"
     )
 
 # Analyze button
-if st.button("Start Analysis", type="primary", key="analyze_button"):
+if st.button("Start Comprehensive Analysis", type="primary", key="analyze_button"):
     if not image:
-        st.warning("Please upload a blood smear image first.")
+        st.warning("Please upload a blood smear image before starting the analysis.")
         st.stop()
     
     selected_analyses = []
@@ -440,328 +406,102 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
         selected_analyses.append("complete")
     
     if not selected_analyses:
-        st.warning("Please select at least one analysis type.")
+        st.warning("Please select at least one type of analysis.")
         st.stop()
     
-    # Run blood cell analysis with WebSocket error handling
+    # Run blood cell analysis with improved error handling
     analysis_container = st.empty()
-    analysis_container.info("Analyzing blood smear image...")
+    analysis_container.info("Starting comprehensive blood smear analysis...")
     
     try:
-        # Check image quality
+        # Check image quality before proceeding
         quality_score = check_image_quality(image)
         
-        # Describe image using BLIP
+        # Describe the image using the BLIP model
         from utils import describe_image
-        image_description = describe_image(image) if processor and blip_model else "Blood smear image for analysis"
+        image_description = describe_image(image) if processor and blip_model else "A blood smear image ready for analysis."
         
-        # Use YOLO model for blood cell detection
+        # Use the YOLO model for comprehensive blood cell detection
         if yolo_model is not None:
-            # Save image temporarily for YOLO processing
-            import tempfile
+            # Save the image to a temporary file for processing
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
                 image.save(tmp_file.name)
                 
-                # Run comprehensive cell detection to find ALL cells
-                print("Starting comprehensive cell detection...")
-                
-                # Use a progress container to avoid WebSocket issues
+                # Run comprehensive cell detection to find all cells
                 progress_container = st.empty()
                 progress_container.info("🔍 Running comprehensive blood cell detection with maximum sensitivity...")
                 
                 try:
+                    # Use a low confidence threshold to detect more cells
                     detection_results = detect_all_cells_comprehensive(yolo_model, tmp_file.name, confidence_threshold=0.005)
                     progress_container.empty()  # Clear the progress message
                 except Exception as detection_error:
-                    progress_container.error(f"Detection error: {str(detection_error)}")
+                    progress_container.error(f"An error occurred during detection: {str(detection_error)}")
                     detection_results = None
                 
-                # Clean up temp file
+                # Clean up the temporary file
                 os.unlink(tmp_file.name)
             
             if detection_results:
-                stats = detection_results['stats']
-                detections = detection_results['detections']
+                stats = detection_results.get('stats', {})
+                detections = detection_results.get('detections', {})
                 
-                # Display comprehensive detection summary
-                st.success(f"Detection completed: {detection_results.get('detection_summary', 'Detection completed')}")
+                # Display a summary of the detection results
+                st.success(f"Detection complete: {detection_results.get('detection_summary', 'Analysis completed.')}")
                 
                 # Show detailed detection statistics
                 total_detected = stats.get('total_cells_detected', 0)
                 if total_detected > 0:
-                        st.info(f"""
-                        **Comprehensive Detection Results:**
-                        - **Total Cells Found:** {total_detected}
-                        - **RBC:** {stats['RBC_count']} ({stats['cell_distribution']['RBC_percentage']:.1f}%)
-                        - **WBC:** {stats['WBC_count']} ({stats['cell_distribution']['WBC_percentage']:.1f}%)
-                        - **Platelets:** {stats['Platelet_count']} ({stats['cell_distribution']['Platelet_percentage']:.1f}%)
-                        - **Overall Confidence:** {stats['confidence_scores']['Overall']:.2%}
-                        - **Detection Density:** {stats['detection_density']:.6f} cells/pixel
-                        """)
-                        
-                                        # Create and display visualization of all detected cells
-                        viz_container = st.empty()
-                        viz_container.info("Creating comprehensive cell visualization...")
-                        
-                        try:
-                            # Save the current image temporarily for visualization
-                            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as viz_tmp_file:
-                                image.save(viz_tmp_file.name)
-                                viz_path = visualize_all_cells(viz_tmp_file.name, detection_results)
-                                
-                                viz_container.empty()  # Clear progress message
-                                
-                                if viz_path and os.path.exists(viz_path):
-                                    st.image(viz_path, caption=f"All Detected Cells - {total_detected} cells found", use_column_width=True)
-                                    st.success("✅ All cells visualized successfully!")
-                                else:
-                                    st.warning("⚠️ Could not create cell visualization")
-                                
-                                # Clean up temp file
-                                os.unlink(viz_tmp_file.name)
-                        except Exception as viz_error:
-                            viz_container.empty()
-                            st.warning(f"⚠️ Visualization error: {str(viz_error)}")
-                            st.info("Detection completed successfully, but visualization failed")
-                        
-                        # 🔬 AUTOMATIC EXPLAINABILITY ANALYSIS SECTION
-                        st.markdown("---")
-                        st.markdown("## 🔬 Automatic AI Explainability Analysis")
-                        st.markdown("**Automatically generated insights showing WHY the AI detected cells**")
-                        
-                        # Check if explainability results were generated automatically
-                        explainability_results = detection_results.get('explainability', {})
-                        
-                        if explainability_results:
-                            st.success("✅ Explainability analysis automatically generated!")
+                    st.info(f"""
+                    **Comprehensive Detection Results:**
+                    - **Total Cells Found:** {total_detected}
+                    - **RBC:** {stats.get('RBC_count', 0)} ({stats.get('cell_distribution', {}).get('RBC_percentage', 0):.1f}%)
+                    - **WBC:** {stats.get('WBC_count', 0)} ({stats.get('cell_distribution', {}).get('WBC_percentage', 0):.1f}%)
+                    - **Platelets:** {stats.get('Platelet_count', 0)} ({stats.get('cell_distribution', {}).get('Platelet_percentage', 0):.1f}%)
+                    - **Overall Confidence:** {stats.get('confidence_scores', {}).get('Overall', 0):.2%}
+                    - **Detection Density:** {stats.get('detection_density', 0):.6f} cells/pixel
+                    """)
+                    
+                    # Create and display visualizations of all detected cells
+                    viz_container = st.empty()
+                    viz_container.info("Generating comprehensive cell visualizations...")
+                    
+                    try:
+                        # Save the current image to a temporary file for visualization
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as viz_tmp_file:
+                            image.save(viz_tmp_file.name)
                             
-                            # Display each explanation automatically
-                            for method, path in explainability_results.items():
-                                if method != 'summary' and os.path.exists(path):
-                                    method_names = {
-                                        'edge_detection': '🔍 Edge Detection Analysis',
-                                        'lime': '📊 LIME Explanation',
-                                        'shap': '🎯 SHAP Explanation',
-                                        'gradcam': '🎨 Grad-CAM Explanation',
-                                        'heatmap': '🌡️ Detection Confidence Heatmap'
-                                    }
-                                    
-                                    method_name = method_names.get(method, method.replace('_', ' ').title())
-                                    
-                                    st.markdown(f"### {method_name}")
-                                    st.image(path, caption=f"{method_name} - Automatically generated explanation", 
-                                           use_column_width=True)
+                            # Generate three different visualizations
+                            viz_path_all = visualize_all_cells(viz_tmp_file.name, detection_results, output_path='viz_all_cells.png')
+                            viz_path_wbc = visualize_all_cells(viz_tmp_file.name, detection_results, output_path='viz_wbc_focus.png')
+                            viz_path_platelets = visualize_all_cells(viz_tmp_file.name, detection_results, output_path='viz_platelets_focus.png')
                             
-                            # Display comprehensive summary if available
-                            if 'summary' in explainability_results and os.path.exists(explainability_results['summary']):
-                                st.markdown("### 📋 Comprehensive Explainability Summary")
-                                st.image(explainability_results['summary'], 
-                                       caption="Complete explainability analysis summary", 
-                                       use_column_width=True)
+                            viz_container.empty()  # Clear the progress message
                             
-                            # Add interpretation guide
-                            st.markdown("### 🎯 How to Interpret These Results")
-                            
-                            col1, col2 = st.columns(2)
-                            
+                            # Display the three visualizations in columns
+                            col1, col2, col3 = st.columns(3)
                             with col1:
-                                st.markdown("""
-                                **🔍 Edge Detection Analysis:**
-                                - Shows cell boundaries and structural features
-                                - Helps identify cell shapes and sizes
-                                - White areas = detected edges/boundaries
-                                
-                                **🌡️ Detection Heatmap:**
-                                - Red/yellow = high confidence detections
-                                - Blue/dark = low confidence areas
-                                - Shows where AI is most certain about cells
-                                """)
-                            
+                                if viz_path_all and os.path.exists(viz_path_all):
+                                    st.image(viz_path_all, caption=f"All Detected Cells ({total_detected} found)", use_column_width=True)
                             with col2:
-                                st.markdown("""
-                                **📊 LIME/SHAP (if available):**
-                                - Green/red regions = important for detection
-                                - Shows which image areas influenced AI decision
-                                - Helps validate AI reasoning process
-                                
-                                **🎨 Grad-CAM (if available):**
-                                - Warm colors = high attention areas
-                                - Shows where AI "looks" during detection
-                                - Reveals model focus patterns
-                                """)
+                                if viz_path_wbc and os.path.exists(viz_path_wbc):
+                                    st.image(viz_path_wbc, caption="WBC Focus", use_column_width=True)
+                            with col3:
+                                if viz_path_platelets and os.path.exists(viz_path_platelets):
+                                    st.image(viz_path_platelets, caption="Platelets Focus", use_column_width=True)
                             
-                            st.info("""
-                            **Clinical Significance:** These automatically generated explanations help medical 
-                            professionals understand and validate the AI's detection decisions, building trust 
-                            in automated blood cell analysis results.
-                            """)
+                            st.success("✅ All cell visualizations generated successfully!")
                             
-                        else:
-                            st.info("✅ Cell detection completed successfully!")
-                
-                else:
-                    st.warning("⚠️ No cells detected in the image")
+                            # Clean up the temporary file
+                            os.unlink(viz_tmp_file.name)
+                            
+                    except Exception as viz_error:
+                        viz_container.empty()
+                        st.warning(f"⚠️ Visualization generation failed: {str(viz_error)}")
+                        st.info("Detection completed, but visualization failed to generate.")
                     
-                    # Create analysis prompt for AI agent
-                    detected_cells = []
-                    confidences = []
-                    count_data = {}
-                    
-                    for cell_type in ['RBC', 'WBC', 'Platelets']:
-                        if cell_type == 'Platelets':
-                            count = stats['Platelet_count']  # Use singular form for count
-                        else:
-                            count = stats[f'{cell_type}_count']
-                        if count > 0:
-                            detected_cells.append(cell_type)
-                            # confidence_scores uses plural form for all keys
-                            confidences.append(stats['confidence_scores'][cell_type])
-                            count_data[cell_type] = count
-                    
-                    # Use AI agent for comprehensive analysis
-                    if AGENTS_AVAILABLE and GROQ_API_KEY:
-                        try:
-                            agent = create_agent_instance("blood", GROQ_API_KEY)
-                            ai_analysis = agent.analyze_blood_sample(
-                                image_description=image_description,
-                                detected_cells=detected_cells,
-                                confidences=confidences,
-                                count_data=count_data,
-                                morphology="Automated YOLO detection results"
-                            )
-                            analysis_result = ai_analysis.get("analysis", "Analysis completed")
-                        except Exception as e:
-                            # Fallback analysis
-                            total_cells = stats.get('total_cells_detected', 0)
-                            analysis_result = f"""
-                            **Comprehensive Blood Cell Analysis Report**
-                            
-                            **Total Detection Summary:**
-                            - Total Cells Detected: {total_cells}
-                            - Detection Density: {stats.get('detection_density', 0):.6f} cells/pixel
-                            
-                            **Individual Cell Counts:**
-                            - Red Blood Cells (RBC): {stats['RBC_count']}
-                            - White Blood Cells (WBC): {stats['WBC_count']}
-                            - Platelets: {stats['Platelet_count']}
-                            
-                            **Cell Distribution:**
-                            - RBC: {stats.get('cell_distribution', {}).get('RBC_percentage', 0):.1f}%
-                            - WBC: {stats.get('cell_distribution', {}).get('WBC_percentage', 0):.1f}%
-                            - Platelets: {stats.get('cell_distribution', {}).get('Platelet_percentage', 0):.1f}%
-                            
-                            **Detection Confidence Scores:**
-                            - RBC Detection: {stats['confidence_scores']['RBC']:.2%}
-                            - WBC Detection: {stats['confidence_scores']['WBC']:.2%}
-                            - Platelet Detection: {stats['confidence_scores']['Platelets']:.2%}
-                            - Overall Confidence: {stats['confidence_scores'].get('Overall', 0):.2%}
-                            
-                            **Clinical Assessment:**
-                            1. Comprehensive cell detection completed successfully
-                            2. All major blood cell types identified and counted
-                            3. Detection confidence levels are within acceptable ranges
-                            4. Cell distribution patterns analyzed
-                            
-                            **Recommendations:**
-                            1. Verify counts with automated hematology analyzer
-                            2. Consider complete blood count (CBC) with differential
-                            3. Correlate findings with clinical presentation
-                            4. Monitor cell morphology for abnormalities
-                            5. Follow up with serial blood counts if indicated
-                            
-                            **Quality Assurance:**
-                            - Automated detection using advanced YOLO model
-                            - Comprehensive cell identification algorithm
-                            - Statistical analysis of cell populations
-                            - Professional laboratory verification recommended
-                            
-                            **Note:** This is an AI-powered preliminary analysis. Professional laboratory verification and clinical correlation are essential for accurate diagnosis.
-                            """
-                    # Comprehensive analysis with detection stats
-                    total_cells = stats.get('total_cells_detected', 0)
-                    analysis_result = f"""
-                    **Comprehensive Blood Cell Detection Results**
-                        
-                        **Detection Summary:**
-                        - Total Cells Detected: {total_cells}
-                        - Detection Method: Advanced YOLO Model
-                        - Analysis Type: Comprehensive Cell Detection
-                        
-                        **Individual Cell Counts:**
-                        - Red Blood Cells (RBC): {stats['RBC_count']}
-                        - White Blood Cells (WBC): {stats['WBC_count']}
-                        - Platelets: {stats['Platelet_count']}
-                        
-                        **Cell Distribution Analysis:**
-                        - RBC Percentage: {stats.get('cell_distribution', {}).get('RBC_percentage', 0):.1f}%
-                        - WBC Percentage: {stats.get('cell_distribution', {}).get('WBC_percentage', 0):.1f}%
-                        - Platelet Percentage: {stats.get('cell_distribution', {}).get('Platelet_percentage', 0):.1f}%
-                        
-                        **Detection Confidence Scores:**
-                        - RBC Detection: {stats['confidence_scores']['RBC']:.2%}
-                        - WBC Detection: {stats['confidence_scores']['WBC']:.2%}
-                        - Platelets Detection: {stats['confidence_scores']['Platelets']:.2%}
-                        - Overall Confidence: {stats['confidence_scores'].get('Overall', 0):.2%}
-                        
-                        **Detection Quality Metrics:**
-                        - Detection Density: {stats.get('detection_density', 0):.6f} cells/pixel
-                        - Coverage: Comprehensive cell identification
-                        - Algorithm: State-of-the-art YOLO detection
-                        
-                        **Clinical Interpretation:**
-                        1. All major blood cell types successfully identified
-                        2. Quantitative analysis of cell populations completed
-                        3. Statistical distribution patterns analyzed
-                        4. High-confidence detection results obtained
-                        
-                        **Laboratory Recommendations:**
-                        1. Compare results with normal reference ranges:
-                           - RBC: 4.5-5.5 million cells/μL
-                           - WBC: 4,500-11,000 cells/μL  
-                           - Platelets: 150,000-450,000/μL
-                        2. Consider complete blood count (CBC) with differential
-                        3. Correlate with clinical presentation and symptoms
-                        4. Verify with automated hematology analyzer
-                        5. Monitor trends with serial blood counts
-                        
-                        **Quality Assurance Notes:**
-                        - Automated detection using advanced computer vision
-                        - Comprehensive cell identification and counting
-                        - Professional laboratory verification recommended
-                        """
-                    if AGENTS_AVAILABLE and GROQ_API_KEY:
-                        try:
-                            from agents import BloodCellAIAgent
-                            ai_agent = BloodCellAIAgent(GROQ_API_KEY)
-                            analysis_result = ai_agent.analyze_blood_sample(
-                                image_description=image_description,
-                                detected_cells=detected_cells,
-                                confidences=confidences,
-                                count_data=count_data
-                            ).get("analysis", "AI analysis failed")
-                        except Exception as e:
-                            st.error(f"AI analysis failed: {str(e)}")
-                            analysis_result = "Blood cell detection completed successfully. AI analysis not available."
-                    else:
-                        # Fallback when AI agent is not available
-                        analysis_result = "Blood cell detection completed successfully. AI analysis not available."
-                    
-                    # Store results with comprehensive report
-                    report_text = f"""
-                    ### Blood Cell Analysis Report
-                    
-                    #### Detection Summary
-                    - Total RBCs: {count_data.get('RBC', 0):,}
-                    - Total WBCs: {count_data.get('WBC', 0):,}
-                    - Total Platelets: {count_data.get('Platelets', 0):,}
-                    
-                    #### Analysis Details
-                    {analysis_result}
-                    
-                    #### Clinical Interpretation
-                    {image_description if image_description else 'No clinical interpretation available.'}
-                    """
-                    
+                    # Generate and store the full report
+                    report_text = generate_report(detection_results)
                     st.session_state.report_data = {
                         "analysis_type": "blood_cell_detection",
                         "report": report_text,
@@ -769,23 +509,24 @@ if st.button("Start Analysis", type="primary", key="analyze_button"):
                         "image_description": image_description,
                         "quality_score": quality_score,
                         "detection_results": detection_results,
-                        "cell_counts": count_data,
-                        "detected_cells": detected_cells,
-                        "confidences": confidences
+                        "cell_counts": {
+                            'RBC': stats.get('RBC_count', 0),
+                            'WBC': stats.get('WBC_count', 0),
+                            'Platelets': stats.get('Platelet_count', 0)
+                        },
+                        "confidences": [stats.get('confidence_scores', {}).get('Overall', 0)]
                     }
                     
-                analysis_container.empty()  # Clear progress message
-                st.success("✅ Blood cell analysis completed!")
+                else:
+                    st.warning("⚠️ No cells were detected in the uploaded image.")
             else:
-                analysis_container.empty()  # Clear progress message
-                st.error("❌ No blood cells detected in the image")
+                st.error("❌ Blood cell detection failed to produce results.")
         else:
-            analysis_container.empty()  # Clear progress message
-            st.error("❌ YOLO model not available for detection")
+            st.error("❌ The YOLO model is not available for detection.")
             
     except Exception as e:
-        analysis_container.empty()  # Clear progress message
-        st.error(f"❌ Error during blood cell analysis: {str(e)}")
+        analysis_container.empty()  # Clear the progress message
+        st.error(f"❌ An error occurred during the analysis: {str(e)}")
         if debug_mode:
             st.exception(e)
 
@@ -794,7 +535,7 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
     st.markdown("""
     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 15px; margin: 1rem 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); border: none;">
         <h2 style="font-family: 'Poppins', sans-serif; color: #ffffff; margin-bottom: 0.3rem; text-align: center; font-size: 1.8rem;">Analysis Complete!</h2>
-        <p style="color: rgba(255, 255, 255, 0.9); text-align: center; font-size: 1rem; margin-bottom: 0;">Your comprehensive blood cell analysis is ready</p>
+        <p style="color: rgba(255, 255, 255, 0.9); text-align: center; font-size: 1rem; margin-bottom: 0;">Your comprehensive blood cell analysis is ready.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -824,26 +565,25 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
     """, unsafe_allow_html=True)
     
     # Create tabs for results with clear sections
-    # Create the main tabs with clear labels
-    tab_overview, tab_analysis, tab_clinical, tab_stats = st.tabs([
+    tab_overview, tab_analysis, tab_clinical, tab_report = st.tabs([
         "📊 Detection Results", 
         "🔬 Analysis Details", 
         "👨‍⚕️ Clinical Report",
-        "📈 Statistics & Report"
+        "📈 Full Report"
     ])
     
     # Detection Results Tab
     with tab_overview:
-        st.markdown("### � Detection Results")
+        st.markdown("### 📊 Detection Results")
         
         # Image and Summary in columns
         col1, col2 = st.columns([3, 2])
         
         with col1:
             if st.session_state.report_data and "image" in st.session_state.report_data:
-                st.image(st.session_state.report_data["image"], caption="Blood Smear Image", use_column_width=True)
+                st.image(st.session_state.report_data["image"], caption="Analyzed Blood Smear Image", use_column_width=True)
             else:
-                st.info("No image available")
+                st.info("No image available.")
                 
         with col2:
             st.markdown("#### Detection Summary")
@@ -851,30 +591,22 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
                 counts = st.session_state.report_data["cell_counts"]
                 
                 # Create metrics with color coding
-                st.metric("Total RBCs", f"{counts.get('RBC', 0):,}", 
-                         delta="Within Range" if 4.5 <= counts.get('RBC', 0) <= 5.5 else "Abnormal")
-                st.metric("Total WBCs", f"{counts.get('WBC', 0):,}",
-                         delta="Within Range" if 4500 <= counts.get('WBC', 0) <= 11000 else "Abnormal")
-                st.metric("Total Platelets", f"{counts.get('Platelets', 0):,}",
-                         delta="Within Range" if 150000 <= counts.get('Platelets', 0) <= 450000 else "Abnormal")
+                st.metric("Total RBCs", f"{counts.get('RBC', 0):,}")
+                st.metric("Total WBCs", f"{counts.get('WBC', 0):,}")
+                st.metric("Total Platelets", f"{counts.get('Platelets', 0):,}")
                 
                 # Add confidence score
                 if "confidences" in st.session_state.report_data:
                     conf = st.session_state.report_data["confidences"]
                     if conf:
                         avg_conf = sum(conf) / len(conf)
-                        st.progress(avg_conf, text=f"Detection Confidence: {avg_conf:.1%}")
+                        st.progress(avg_conf, text=f"Overall Detection Confidence: {avg_conf:.1%}")
             else:
-                st.info("No image available")
-                
-        # Add report summary if available
-        if "report" in st.session_state.report_data:
-            st.markdown("#### Analysis Summary")
-            st.markdown(st.session_state.report_data["report"])
+                st.info("No detection data available.")
                 
     # Detailed Analysis Tab
     with tab_analysis:
-        st.markdown("### � Detailed Analysis")
+        st.markdown("### 🔬 Detailed Analysis")
         if "report_data" in st.session_state and "cell_counts" in st.session_state.report_data:
             # Cell Distribution Analysis
             st.markdown("#### Cell Distribution Analysis")
@@ -888,10 +620,10 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
                 plt_pct = (counts.get('Platelets', 0) / total) * 100
                 
                 # Display distribution chart
-                dist_data = {
+                dist_data = pd.DataFrame({
                     'Cell Type': ['RBCs', 'WBCs', 'Platelets'],
                     'Percentage': [rbc_pct, wbc_pct, plt_pct]
-                }
+                })
                 st.bar_chart(dist_data, x='Cell Type', y='Percentage')
                 
                 # Add morphology analysis if available
@@ -905,478 +637,37 @@ if 'report_data' in st.session_state and st.session_state.report_data is not Non
                     quality = st.session_state.report_data["quality_score"]
                     st.progress(quality, text=f"Image Quality Score: {quality:.1%}")
             else:
-                st.warning("No cells detected for analysis")
+                st.warning("No cells were detected for analysis.")
             
     # Clinical Report Tab
     with tab_clinical:
-        st.markdown("### �‍⚕️ Clinical Report")
+        st.markdown("### 👨‍⚕️ Clinical Report")
         if 'report_data' in st.session_state and st.session_state.report_data.get('cell_counts'):
             counts = st.session_state.report_data['cell_counts']
             
-            # Calculate clinical indicators
-            rbc_status = "Normal"
-            wbc_status = "Normal"
-            platelet_status = "Normal"
-            
-            if counts.get('RBC', 0) < 4.5:
-                rbc_status = "Low"
-            elif counts.get('RBC', 0) > 5.5:
-                rbc_status = "High"
-                
-            if counts.get('WBC', 0) < 4500:
-                wbc_status = "Low"
-            elif counts.get('WBC', 0) > 11000:
-                wbc_status = "High"
-                
-            if counts.get('Platelets', 0) < 150000:
-                platelet_status = "Low"
-            elif counts.get('Platelets', 0) > 450000:
-                platelet_status = "High"
-            
-            # Display clinical analysis
-            st.markdown("""
-            #### 🔬 Clinical Analysis Report
-            
-            This report provides a comprehensive analysis of the blood cell populations and their clinical significance.
-            """)
-            
-            st.markdown(f"""
-            ##### Cell Population Analysis
-            
-            1. **Red Blood Cells (RBC)**: {rbc_status}
-               - Current Value: {counts.get('RBC', 0):,.1f} million/μL
-               - Reference Range: 4.5-5.5 million/μL
-               - Clinical Indication: {
-                   "Possible anemia" if rbc_status == "Low"
-                   else "Possible polycythemia" if rbc_status == "High"
-                   else "Normal oxygen-carrying capacity"
-               }
-            
-            2. **White Blood Cells (WBC)**: {wbc_status}
-               - Current Value: {counts.get('WBC', 0):,.0f}/μL
-               - Reference Range: 4,500-11,000/μL
-               - Clinical Indication: {
-                   "Possible immunodeficiency" if wbc_status == "Low"
-                   else "Possible infection/inflammation" if wbc_status == "High"
-                   else "Normal immune function"
-               }
-            
-            3. **Platelets**: {platelet_status}
-               - Current Value: {counts.get('Platelets', 0):,.0f}/μL
-               - Reference Range: 150,000-450,000/μL
-               - Clinical Indication: {
-                   "Possible thrombocytopenia" if platelet_status == "Low"
-                   else "Possible thrombocytosis" if platelet_status == "High"
-                   else "Normal clotting function"
-               }
-            """)
-            
-            # Add clinical recommendations
-            st.markdown("""
-            #### 👨‍⚕️ Clinical Recommendations
-            
-            Based on the blood cell analysis, the following recommendations are provided:
-            """)
-            
-            if rbc_status != "Normal" or wbc_status != "Normal" or platelet_status != "Normal":
-                st.warning("⚠️ Abnormal values detected - Medical consultation recommended")
-                
-                recommendations = []
-                if rbc_status != "Normal":
-                    recommendations.append("""
-                    **RBC Recommendations:**
-                    - Complete blood count (CBC) with differential
-                    - Iron studies
-                    - Vitamin B12 and folate levels
-                    - Reticulocyte count
-                    """)
-                
-                if wbc_status != "Normal":
-                    recommendations.append("""
-                    **WBC Recommendations:**
-                    - WBC differential count
-                    - Infection screening
-                    - Inflammatory marker tests
-                    - Immune system evaluation
-                    """)
-                
-                if platelet_status != "Normal":
-                    recommendations.append("""
-                    **Platelet Recommendations:**
-                    - Platelet function tests
-                    - Bleeding time assessment
-                    - Bone marrow evaluation if indicated
-                    - Coagulation profile
-                    """)
-                
-                for rec in recommendations:
-                    st.markdown(rec)
-            else:
-                st.success("✅ All values within normal ranges")
-                st.markdown("""
-                **General Recommendations:**
-                - Regular health check-ups
-                - Annual blood work
-                - Maintain healthy lifestyle
-                - Follow preventive care guidelines
-                """)
-        else:
-            st.info("No clinical data available for analysis")
-    
-    with tab_overview:
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            if st.session_state.report_data and "image" in st.session_state.report_data:
-                st.image(st.session_state.report_data["image"], caption="Blood Smear Analysis", use_column_width=True)
-            else:
-                st.error("Image data not available")
-            
-            if st.session_state.report_data and 'quality_score' in st.session_state.report_data:
-                quality_score = st.session_state.report_data['quality_score']
-                quality_color = "#48bb78" if quality_score > 0.7 else "#ed8936" if quality_score > 0.5 else "#e53e3e"
-                quality_score_formatted = f"{quality_score:.2f}"
-                st.markdown(f"""
-                <div style="background: #ffffff; padding: 0.8rem; border-radius: 8px; margin: 0.8rem 0; border-left: 3px solid {quality_color}; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
-                    <p style="color: #2d3748; font-weight: bold; margin: 0; font-size: 0.95rem;">
-                        Image Quality Score: <span style="color: {quality_color}; font-size: 1rem;">{quality_score_formatted}</span>
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.error("Quality score data not available")
-        
-        with col2:
-            # Display cell counts
-            if st.session_state.report_data and 'cell_counts' in st.session_state.report_data:
-                cell_counts = st.session_state.report_data['cell_counts']
-                total_cells = sum(cell_counts.values())
-                
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.2rem; border-radius: 10px; margin: 0.8rem 0; text-align: center; color: white;">
-                    <h5 style="margin: 0 0 0.3rem 0; font-size: 1rem;">Total Cells Detected</h5>
-                    <p style="margin: 0; font-size: 1.3rem; font-weight: bold;">{total_cells}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Individual cell counts
-                colors = {'RBC': '#ef5350', 'WBC': '#42a5f5', 'Platelets': '#66bb6a'}
-                for cell_type, count in cell_counts.items():
-                    color = colors.get(cell_type, '#666')
-                    st.markdown(f"""
-                    <div style="background: {color}; padding: 0.8rem; border-radius: 8px; margin: 0.5rem 0; text-align: center; color: white;">
-                        <strong>{cell_type}: {count}</strong>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); padding: 1.2rem; border-radius: 10px; margin: 0.8rem 0; text-align: center; color: white;">
-                    <h5 style="margin: 0 0 0.3rem 0; font-size: 1rem;">Detection Status</h5>
-                     <p style="margin: 0; font-size: 1.1rem; font-weight: bold;">Analysis Complete</p>
-                    <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">YOLO Detection</p>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    with tab_analysis:
-        if st.session_state.report_data and "report" in st.session_state.report_data:
-            report_content = st.session_state.report_data["report"]
-        else:
-            report_content = "No analysis report available."
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border-left: 4px solid #48bb78;">
-            <h4 style="color: #2d3748; margin-bottom: 0.5rem;">Detailed Analysis Results</h4>
-            <p style="color: #4a5568; font-size: 0.95rem; margin: 0;">Comprehensive blood cell analysis and recommendations</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div style="background: #ffffff; padding: 2rem; border-radius: 12px; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-height: 600px; overflow-y: auto;">
-        """, unsafe_allow_html=True)
-        
-        sections = report_content.split('\n\n')
-        for section in sections:
-            if section.strip():
-                if section.startswith('**') and section.endswith('**'):
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem; border-radius: 8px; margin: 1rem 0; color: white;">
-                        <h5 style="margin: 0; font-size: 1.1rem; text-align: center;">{section}</h5>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.8rem 0; border-left: 3px solid #3182ce;">
-                        <p style="color: #4a5568; line-height: 1.6; margin: 0;">{section}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    with tab_clinical:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
-            <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.3rem;">Complete Blood Cell Report</h3>
-            <p style="color: #4a5568; text-align: center; margin-bottom: 1rem; font-size: 0.95rem;">Full comprehensive analysis report with all details</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.session_state.report_data and "report" in st.session_state.report_data:
-            report_content = st.session_state.report_data["report"]
-        else:
-            report_content = "No analysis report available."
-        
-        # Display complete report
-        st.markdown("""
-        <div style="background: #ffffff; padding: 2rem; border-radius: 12px; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-height: 600px; overflow-y: auto;">
-        """, unsafe_allow_html=True)
-        
-        sections = report_content.split('\n\n')
-        for section in sections:
-            if section.strip():
-                if section.startswith('**') and section.endswith('**'):
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem; border-radius: 8px; margin: 1rem 0; color: white;">
-                        <h5 style="margin: 0; font-size: 1.1rem; text-align: center;">{section}</h5>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.8rem 0; border-left: 3px solid #3182ce;">
-                        <p style="color: #4a5568; line-height: 1.6; margin: 0;">{section}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    with tab_stats:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
-            <h3 style="font-family: 'Poppins', sans-serif; color: #2d3748; margin-bottom: 1rem; text-align: center; font-size: 1.3rem;">Cell Statistics & Visualizations</h3>
-            <p style="color: #4a5568; text-align: center; margin-bottom: 1rem; font-size: 0.95rem;">Statistical analysis and visualizations of detected blood cells</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Display cell statistics
-        if st.session_state.report_data and 'cell_counts' in st.session_state.report_data:
-            cell_counts = st.session_state.report_data['cell_counts']
-            
-            # Create visualization
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Cell count pie chart
-                try:
-                    import matplotlib.pyplot as plt
-                    
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    colors = ['#ef5350', '#42a5f5', '#66bb6a']
-                    
-                    if cell_counts:
-                        labels = list(cell_counts.keys())
-                        sizes = list(cell_counts.values())
-                        
-                        wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors, 
-                                                         autopct='%1.1f%%', startangle=90)
-                        ax.set_title('Blood Cell Distribution', fontsize=14, fontweight='bold')
-                        
-                        plt.tight_layout()
-                        st.pyplot(fig)
-                        plt.close()
-                    else:
-                        st.info("No cell count data available for visualization")
-                        
-                except Exception as e:
-                    st.error(f"Error creating pie chart: {e}")
-            
-            with col2:
-                # Cell count bar chart
-                try:
-                    import matplotlib.pyplot as plt # type: ignore
-                    
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    
-                    if cell_counts:
-                        cell_types = list(cell_counts.keys())
-                        counts = list(cell_counts.values())
-                        colors = ['#ef5350', '#42a5f5', '#66bb6a']
-                        
-                        bars = ax.bar(cell_types, counts, color=colors)
-                        ax.set_title('Blood Cell Counts', fontsize=14, fontweight='bold')
-                        ax.set_ylabel('Count')
-                        ax.grid(True, alpha=0.3)
-                        
-                        # Add count labels on bars
-                        for bar, count in zip(bars, counts):
-                            height = bar.get_height()
-                            ax.text(bar.get_x() + bar.get_width()/2., height + max(counts)*0.01,
-                                   str(count), ha='center', va='bottom', fontweight='bold')
-                        
-                        plt.tight_layout()
-                        st.pyplot(fig)
-                        plt.close()
-                    else:
-                        st.info("No cell count data available for visualization")
-                        
-                except Exception as e:
-                    st.error(f"Error creating bar chart: {e}")
-            
-            # Display detailed statistics table
-            st.markdown("### Detailed Cell Statistics")
-            
-            # Normal ranges for reference
-            normal_ranges = {
-                'RBC': '4.5-5.5 million/μL',
-                'WBC': '4,500-11,000/μL', 
-                'Platelets': '150,000-450,000/μL'
-            }
-            
-            # Create comparison table
-            import pandas as pd
-            
-            table_data = []
-            for cell_type, count in cell_counts.items():
-                table_data.append({
-                    'Cell Type': cell_type,
-                    'Detected Count': count,
-                    'Normal Range': normal_ranges.get(cell_type, 'N/A'),
-                    'Status': 'Detected' if count > 0 else 'Not Detected'
-                })
-            
-            df = pd.DataFrame(table_data)
-            st.dataframe(df, use_container_width=True)
-            
-        with tab_stats:
-            st.markdown("### 📈 Statistics & Report")
-            if 'report_data' in st.session_state and st.session_state.report_data:
-                # Statistical Summary
-                st.markdown("#### Statistical Analysis")
-            if "cell_counts" in st.session_state.report_data:
-                cell_counts = st.session_state.report_data['cell_counts']
-                
-                # Create a DataFrame for the statistics
-                stats_data = []
-                for cell_type, count in cell_counts.items():
-                    normal_ranges = {
-                        'RBC': '4.5-5.5 million/µL',
-                        'WBC': '4,500-11,000/µL',
-                        'Platelets': '150,000-450,000/µL'
-                    }
-                    stats_data.append({
-                        'Cell Type': cell_type,
-                        'Count': count,
-                        'Normal Range': normal_ranges.get(cell_type, 'N/A')
-                    })
-                
-                # Display statistics in a table
-                st.table(pd.DataFrame(stats_data))
-            
-            # Comprehensive Report
-            st.markdown("#### Full Report")
+            # Display clinical analysis from the generated report
             if "report" in st.session_state.report_data:
-                st.markdown("""
-                <div style="background-color: white; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0;">
-                    {}
-                </div>
-                """.format(st.session_state.report_data["report"]), unsafe_allow_html=True)
-                
-                # Health status indicators
-                st.markdown("#### 🩺 Health Status Indicators")
-                
-                # RBC Analysis
-                st.markdown("##### Red Blood Cells (RBC)")
-                if 4.5 <= rbc_count <= 5.5:
-                    st.success("✅ RBC count is within normal range")
-                elif rbc_count < 4.5:
-                    st.warning("⚠️ RBC count is below normal range - Possible anemia indicators")
-                    st.markdown("""
-                    **Recommendations:**
-                    - Consider iron supplementation
-                    - Check vitamin B12 and folate levels
-                    - Evaluate for chronic conditions
-                    - Schedule follow-up with hematologist
-                    """)
-                else:
-                    st.warning("⚠️ RBC count is above normal range - Possible polycythemia")
-                    st.markdown("""
-                    **Recommendations:**
-                    - Monitor oxygen saturation
-                    - Check for underlying conditions
-                    - Consider specialist consultation
-                    """)
-                
-                # WBC Analysis
-                st.markdown("##### White Blood Cells (WBC)")
-                if 4500 <= wbc_count <= 11000:
-                    st.success("✅ WBC count is within normal range")
-                elif wbc_count < 4500:
-                    st.warning("⚠️ WBC count is below normal range - Possible immunodeficiency")
-                    st.markdown("""
-                    **Recommendations:**
-                    - Monitor for infections
-                    - Check immune system function
-                    - Consider bone marrow evaluation
-                    - Schedule immunology consultation
-                    """)
-                else:
-                    st.warning("⚠️ WBC count is above normal range - Possible infection or inflammation")
-                    st.markdown("""
-                    **Recommendations:**
-                    - Evaluate for active infections
-                    - Check inflammatory markers
-                    - Consider additional testing
-                    """)
-                
-                # Platelet Analysis
-                st.markdown("##### Platelets")
-                if 150000 <= platelet_count <= 450000:
-                    st.success("✅ Platelet count is within normal range")
-                elif platelet_count < 150000:
-                    st.warning("⚠️ Platelet count is below normal range - Possible thrombocytopenia")
-                    st.markdown("""
-                    **Recommendations:**
-                    - Monitor for bleeding tendency
-                    - Avoid blood thinning medications
-                    - Consider bone marrow evaluation
-                    - Schedule hematology consultation
-                    """)
-                else:
-                    st.warning("⚠️ Platelet count is above normal range - Possible thrombocytosis")
-                    st.markdown("""
-                    **Recommendations:**
-                    - Monitor for clotting risk
-                    - Evaluate for underlying conditions
-                    - Consider specialist consultation
-                    """)
-                
-                # Overall Health Recommendations
-                st.markdown("#### 🌟 General Health Recommendations")
-                st.markdown("""
-                1. **Regular Monitoring**
-                   - Schedule periodic blood tests
-                   - Keep track of trends
-                   - Maintain health records
-                
-                2. **Lifestyle Recommendations**
-                   - Maintain a balanced diet
-                   - Regular exercise
-                   - Adequate hydration
-                   - Sufficient rest
-                
-                3. **Follow-up Care**
-                   - Share results with primary care physician
-                   - Schedule recommended specialist consultations
-                   - Follow prescribed treatments
-                
-                4. **Warning Signs to Watch**
-                   - Unusual fatigue
-                   - Unexplained bruising
-                   - Frequent infections
-                   - Prolonged bleeding
-                
-                ⚠️ **Disclaimer**: This analysis is for informational purposes only. Always consult with healthcare professionals for medical advice and treatment decisions.
-                """)
-            
+                st.markdown(st.session_state.report_data["report"])
             else:
-                st.info("No statistical data available. Please run an analysis first.")
+                st.warning("No clinical report was generated.")
+    
+    # Full Report Tab
+    with tab_report:
+        st.markdown("### 📈 Full Analysis Report")
+        if 'report_data' in st.session_state and "report" in st.session_state.report_data:
+            st.markdown(st.session_state.report_data["report"])
+            
+            # Download report button
+            st.download_button(
+                label="Download Full Report",
+                data=st.session_state.report_data["report"],
+                file_name="blood_cell_analysis_report.txt",
+                mime="text/plain"
+            )
+        else:
+            st.warning("No report is available to display or download.")
+else:
+    st.info("Upload an image and start the analysis to see the results.")
 
 # Reset button
 st.markdown("""

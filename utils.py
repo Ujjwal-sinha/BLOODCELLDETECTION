@@ -435,22 +435,72 @@ def plot_cell_distribution(cell_counts):
         print(f"Error plotting cell distribution: {e}")
         return None
 
-def generate_report(report_data):
-    """Generate analysis report"""
+def generate_report(detection_results: Dict[str, Any]) -> str:
+    """
+    Generate a comprehensive analysis report from detection results.
+    
+    Args:
+        detection_results: Dictionary containing detection statistics and other data.
+        
+    Returns:
+        str: A formatted string containing the full analysis report.
+    """
     try:
+        stats = detection_results.get('stats', {})
+        report_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Clinical interpretation based on counts
+        rbc_count = stats.get('RBC_count', 0)
+        wbc_count = stats.get('WBC_count', 0)
+        platelet_count = stats.get('Platelet_count', 0)
+        
+        # Basic clinical status
+        rbc_status = "Normal"
+        if rbc_count < 4.5: rbc_status = "Low"
+        elif rbc_count > 5.5: rbc_status = "High"
+        
+        wbc_status = "Normal"
+        if wbc_count < 4500: wbc_status = "Low"
+        elif wbc_count > 11000: wbc_status = "High"
+        
+        platelet_status = "Normal"
+        if platelet_count < 150000: platelet_status = "Low"
+        elif platelet_count > 450000: platelet_status = "High"
+
         report = f"""
-        Blood Cell Analysis Report
-        Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        # Comprehensive Blood Cell Analysis Report
+        **Generated on:** {report_date}
         
-        Analysis Results:
-        {report_data.get('report', 'No analysis available')}
+        ## 1. Detection Summary
+        - **Total Cells Detected:** {stats.get('total_cells_detected', 0)}
+        - **Detection Method:** {detection_results.get('detection_method', 'N/A')}
+        - **Overall Confidence:** {stats.get('confidence_scores', {}).get('Overall', 0):.2%}
         
-        Quality Score: {report_data.get('quality_score', 'N/A')}
+        ## 2. Individual Cell Counts
+        - **Red Blood Cells (RBC):** {rbc_count:,}
+        - **White Blood Cells (WBC):** {wbc_count:,}
+        - **Platelets:** {platelet_count:,}
+        
+        ## 3. Cell Distribution
+        - **RBC Percentage:** {stats.get('cell_distribution', {}).get('RBC_percentage', 0):.1f}%
+        - **WBC Percentage:** {stats.get('cell_distribution', {}).get('WBC_percentage', 0):.1f}%
+        - **Platelet Percentage:** {stats.get('cell_distribution', {}).get('Platelet_percentage', 0):.1f}%
+        
+        ## 4. Clinical Interpretation
+        - **RBC Status:** {rbc_status}
+        - **WBC Status:** {wbc_status}
+        - **Platelet Status:** {platelet_status}
+        
+        ## 5. Recommendations
+        - This is an automated analysis. Please consult a medical professional for a complete diagnosis.
+        - Verify results with a standard laboratory test (CBC).
+        
+        **Disclaimer:** This report is for informational purposes only and is not a substitute for professional medical advice.
         """
         return report
     except Exception as e:
         print(f"Error generating report: {e}")
-        return "Error generating report"
+        return "Error: Could not generate the analysis report."
 
 class BloodCellPDF(FPDF):
     """PDF generator for blood cell analysis reports"""
