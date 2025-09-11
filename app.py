@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,6 +21,10 @@ st.set_page_config(
     page_icon="🔬",
     initial_sidebar_state="expanded"
 )
+
+# Load environment variables from .env file
+load_dotenv()
+
 import cv2
 import numpy as np
 
@@ -325,29 +330,6 @@ def process_blood_cell_image(image):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             saved_paths = save_cell_specific_images(visualizations, f"detection_{timestamp}")
             
-            # Display results
-            st.markdown("### Cell Type Detection Results")
-            # Create three columns for different cell type visualizations
-            viz_col1, viz_col2, viz_col3 = st.columns(3)
-            
-            # Display cell-specific images
-            with viz_col1:
-                st.markdown("#### RBC Detection")
-                st.image(visualizations.get('RBC_visualization', ''), 
-                        caption=f"RBCs Detected: {detections['stats'].get('RBC_count', 0)}", 
-                        use_column_width=True)
-            
-            with viz_col2:
-                st.markdown("#### WBC Detection")
-                st.image(visualizations.get('WBC_visualization', ''), 
-                        caption=f"WBCs Detected: {detections['stats'].get('WBC_count', 0)}", 
-                        use_column_width=True)
-            
-            with viz_col3:
-                st.markdown("#### Platelet Detection")
-                st.image(visualizations.get('Platelet_visualization', ''), 
-                        caption=f"Platelets Detected: {detections['stats'].get('Platelet_count', 0)}", 
-                        use_column_width=True)
             
             return detections, saved_paths
             
