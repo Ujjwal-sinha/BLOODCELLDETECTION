@@ -175,8 +175,8 @@ def save_cell_specific_images(visualizations: Dict[str, np.ndarray], base_filena
     except Exception as e:
         print(f"Error saving cell-specific images: {str(e)}")
         return None
-except ImportError:
-    REQUIRED_PACKAGES['viz'] = False
+    except ImportError:
+      REQUIRED_PACKAGES['viz'] = False
     print("Warning: matplotlib/seaborn not found. Install with: pip install matplotlib seaborn")
 
 try:
