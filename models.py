@@ -50,6 +50,183 @@ def clear_mps_cache():
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
 
+def create_cell_specific_visualizations(image: np.ndarray, detections: Dict) -> Dict[str, np.ndarray]:
+    """
+    Create separate visualizations for RBCs, WBCs, and Platelets.
+    
+    Args:
+        image: Original blood smear image
+        detections: Detection results from enhance_cell_detection
+        
+    Returns:
+        Dictionary containing three separate visualizations
+    """
+    try:
+        # Create copies for each cell type
+        rbc_image = image.copy()
+        wbc_image = image.copy()
+        platelet_image = image.copy()
+        
+        # Define colors for visualization
+        colors = {
+            'RBC': (255, 0, 0),      # Red
+            'WBC': (0, 255, 0),      # Green
+            'Platelets': (0, 0, 255)  # Blue
+        }
+        
+        # Draw RBCs
+        for det in detections['detections']['RBC']:
+            x1, y1, x2, y2 = det['bbox']
+            cv2.rectangle(rbc_image, (x1, y1), (x2, y2), colors['RBC'], 2)
+            cv2.putText(rbc_image, f"RBC {det['confidence']:.2f}", 
+                       (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors['RBC'], 2)
+        
+        # Draw WBCs
+        for det in detections['detections']['WBC']:
+            x1, y1, x2, y2 = det['bbox']
+            cv2.rectangle(wbc_image, (x1, y1), (x2, y2), colors['WBC'], 2)
+            cv2.putText(wbc_image, f"WBC {det['confidence']:.2f}", 
+                       (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors['WBC'], 2)
+        
+        # Draw Platelets
+        for det in detections['detections']['Platelets']:
+            x1, y1, x2, y2 = det['bbox']
+            cv2.rectangle(platelet_image, (x1, y1), (x2, y2), colors['Platelets'], 2)
+            cv2.putText(platelet_image, f"PLT {det['confidence']:.2f}", 
+                       (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors['Platelets'], 2)
+        
+        return {
+            'RBC_visualization': rbc_image,
+            'WBC_visualization': wbc_image,
+            'Platelet_visualization': platelet_image
+        }
+        
+    except Exception as e:
+        print(f"Error in visualization creation: {str(e)}")
+        return None
+
+def enhance_cell_detection(image: np.ndarray) -> Dict:
+    """
+    Enhanced detection method specifically designed to detect WBCs and platelets
+    along with RBCs using computer vision techniques.
+    
+    Args:
+        image: Input blood smear image as numpy array
+        
+    Returns:
+        Dictionary containing detection results
+    """
+    try:
+        if image is None:
+            raise ValueError("Invalid image input")
+        
+        # Convert to RGB for better cell differentiation
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # Convert to HSV for better color segmentation
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        
+        # Initialize detection storage
+        all_detections = {
+            'RBC': [],
+            'WBC': [],
+            'Platelets': [],
+            'All_Cells': []
+        }
+        
+        # Detect WBCs (typically larger and more intensely stained)
+        # WBCs usually appear purple/dark blue in Wright's stain
+        lower_wbc = np.array([100, 50, 50])
+        upper_wbc = np.array([140, 255, 255])
+        wbc_mask = cv2.inRange(hsv, lower_wbc, upper_wbc)
+        wbc_contours, _ = cv2.findContours(wbc_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Detect RBCs (pink/red colored cells)
+        lower_rbc = np.array([160, 50, 50])
+        upper_rbc = np.array([180, 255, 255])
+        rbc_mask = cv2.inRange(hsv, lower_rbc, upper_rbc)
+        rbc_contours, _ = cv2.findContours(rbc_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Detect Platelets (small purple dots)
+        # Convert to grayscale for platelet detection
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        platelet_contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Process WBCs
+        for contour in wbc_contours:
+            area = cv2.contourArea(contour)
+            if area > 500:  # WBCs are typically larger
+                x, y, w, h = cv2.boundingRect(contour)
+                confidence = min(area / 1000, 0.99)  # Normalize confidence
+                all_detections['WBC'].append({
+                    'bbox': [x, y, x+w, y+h],
+                    'confidence': confidence,
+                    'cell_type': 'WBC',
+                    'area': area
+                })
+                all_detections['All_Cells'].append(all_detections['WBC'][-1])
+        
+        # Process RBCs
+        for contour in rbc_contours:
+            area = cv2.contourArea(contour)
+            if 100 < area < 500:  # Typical RBC size range
+                x, y, w, h = cv2.boundingRect(contour)
+                confidence = min(area / 500, 0.99)
+                all_detections['RBC'].append({
+                    'bbox': [x, y, x+w, y+h],
+                    'confidence': confidence,
+                    'cell_type': 'RBC',
+                    'area': area
+                })
+                all_detections['All_Cells'].append(all_detections['RBC'][-1])
+        
+        # Process Platelets
+        for contour in platelet_contours:
+            area = cv2.contourArea(contour)
+            if area < 100:  # Platelets are smallest
+                x, y, w, h = cv2.boundingRect(contour)
+                confidence = min(area / 100, 0.99)
+                all_detections['Platelets'].append({
+                    'bbox': [x, y, x+w, y+h],
+                    'confidence': confidence,
+                    'cell_type': 'Platelets',
+                    'area': area
+                })
+                all_detections['All_Cells'].append(all_detections['Platelets'][-1])
+        
+        # Calculate statistics
+        total_cells = len(all_detections['All_Cells'])
+        stats = {
+            'total_cells_detected': total_cells,
+            'RBC_count': len(all_detections['RBC']),
+            'WBC_count': len(all_detections['WBC']),
+            'Platelet_count': len(all_detections['Platelets']),
+            'cell_distribution': {
+                'RBC_percentage': (len(all_detections['RBC']) / total_cells * 100) if total_cells > 0 else 0,
+                'WBC_percentage': (len(all_detections['WBC']) / total_cells * 100) if total_cells > 0 else 0,
+                'Platelet_percentage': (len(all_detections['Platelets']) / total_cells * 100) if total_cells > 0 else 0
+            },
+            'confidence_scores': {
+                'RBC': np.mean([d['confidence'] for d in all_detections['RBC']]) if all_detections['RBC'] else 0,
+                'WBC': np.mean([d['confidence'] for d in all_detections['WBC']]) if all_detections['WBC'] else 0,
+                'Platelets': np.mean([d['confidence'] for d in all_detections['Platelets']]) if all_detections['Platelets'] else 0,
+                'Overall': np.mean([d['confidence'] for d in all_detections['All_Cells']]) if all_detections['All_Cells'] else 0
+            }
+        }
+        
+        return {
+            'detections': all_detections,
+            'stats': stats,
+            'detection_summary': f"Enhanced Detection Complete: {total_cells} total cells found",
+            'detection_method': 'Enhanced Computer Vision Detection'
+        }
+        
+    except Exception as e:
+        print(f"Error in enhanced detection: {str(e)}")
+        return None
+        torch.mps.empty_cache()
+
 def load_yolo_model(weights_path='yolo11n.pt'):
     """
     Load YOLO model for blood cell detection

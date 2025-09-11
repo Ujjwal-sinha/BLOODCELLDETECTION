@@ -51,6 +51,133 @@ try:
 except ImportError:
     REQUIRED_PACKAGES['viz'] = False
     print("Warning: matplotlib/seaborn not found. Install with: pip install matplotlib seaborn")
+    
+def generate_advanced_report(detections: Dict, image_path: str) -> Dict:
+    """
+    Generate an advanced report with detailed statistics and visualizations
+    
+    Args:
+        detections: Detection results from enhance_cell_detection
+        image_path: Path to the original image
+        
+    Returns:
+        Dictionary containing report data and file paths
+    """
+    try:
+        # Create report directory if it doesn't exist
+        report_dir = "evaluation_results"
+        os.makedirs(report_dir, exist_ok=True)
+        
+        # Extract statistics
+        stats = detections['stats']
+        
+        # Generate detailed text report
+        report_text = f"""Blood Cell Detection Report
+        Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        
+        Summary:
+        - Total Cells Detected: {stats['total_cells_detected']}
+        - RBC Count: {stats['RBC_count']}
+        - WBC Count: {stats['WBC_count']}
+        - Platelet Count: {stats['Platelet_count']}
+        
+        Cell Distribution:
+        - RBC: {stats['cell_distribution']['RBC_percentage']:.2f}%
+        - WBC: {stats['cell_distribution']['WBC_percentage']:.2f}%
+        - Platelets: {stats['cell_distribution']['Platelet_percentage']:.2f}%
+        
+        Confidence Scores:
+        - RBC: {stats['confidence_scores']['RBC']:.3f}
+        - WBC: {stats['confidence_scores']['WBC']:.3f}
+        - Platelets: {stats['confidence_scores']['Platelets']:.3f}
+        - Overall: {stats['confidence_scores']['Overall']:.3f}
+        """
+        
+        # Save detailed report
+        report_path = os.path.join(report_dir, "detailed_report.txt")
+        with open(report_path, 'w') as f:
+            f.write(report_text)
+        
+        # Create visualizations
+        plt.style.use('seaborn')
+        
+        # Cell distribution pie chart
+        plt.figure(figsize=(10, 8))
+        cell_types = ['RBC', 'WBC', 'Platelets']
+        cell_counts = [stats['RBC_count'], stats['WBC_count'], stats['Platelet_count']]
+        plt.pie(cell_counts, labels=cell_types, autopct='%1.1f%%', colors=sns.color_palette("husl", 3))
+        plt.title('Cell Type Distribution')
+        plt.savefig(os.path.join(report_dir, 'cell_distribution_pie.png'))
+        plt.close()
+        
+        # Cell counts bar chart
+        plt.figure(figsize=(10, 6))
+        plt.bar(cell_types, cell_counts)
+        plt.title('Cell Counts by Type')
+        plt.ylabel('Count')
+        plt.savefig(os.path.join(report_dir, 'cell_metrics_bar.png'))
+        plt.close()
+        
+        # Confidence scores radar chart
+        conf_scores = [stats['confidence_scores'][cell_type] for cell_type in cell_types]
+        angles = np.linspace(0, 2*np.pi, len(cell_types), endpoint=False)
+        angles = np.concatenate((angles, [angles[0]]))
+        conf_scores = np.concatenate((conf_scores, [conf_scores[0]]))
+        
+        plt.figure(figsize=(8, 8))
+        ax = plt.subplot(111, projection='polar')
+        ax.plot(angles, conf_scores)
+        ax.fill(angles, conf_scores, alpha=0.25)
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(cell_types)
+        plt.title('Detection Confidence by Cell Type')
+        plt.savefig(os.path.join(report_dir, 'detection_confidence_radar.png'))
+        plt.close()
+        
+        return {
+            'report_path': report_path,
+            'visualization_paths': {
+                'distribution_pie': os.path.join(report_dir, 'cell_distribution_pie.png'),
+                'metrics_bar': os.path.join(report_dir, 'cell_metrics_bar.png'),
+                'confidence_radar': os.path.join(report_dir, 'detection_confidence_radar.png')
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error generating advanced report: {str(e)}")
+        return None
+
+def save_cell_specific_images(visualizations: Dict[str, np.ndarray], base_filename: str) -> Dict[str, str]:
+    """
+    Save cell-specific visualization images
+    
+    Args:
+        visualizations: Dictionary containing cell-specific visualization arrays
+        base_filename: Base name for the output files
+        
+    Returns:
+        Dictionary containing paths to saved images
+    """
+    try:
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join("evaluation_results", "cell_specific_images")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save each visualization
+        saved_paths = {}
+        for cell_type, image in visualizations.items():
+            output_path = os.path.join(output_dir, f"{base_filename}_{cell_type}.png")
+            cv2.imwrite(output_path, image)
+            saved_paths[cell_type] = output_path
+            
+        return saved_paths
+        
+    except Exception as e:
+        print(f"Error saving cell-specific images: {str(e)}")
+        return None
+except ImportError:
+    REQUIRED_PACKAGES['viz'] = False
+    print("Warning: matplotlib/seaborn not found. Install with: pip install matplotlib seaborn")
 
 try:
     import streamlit as st

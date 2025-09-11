@@ -27,11 +27,12 @@ import numpy as np
 from models import (
     device, clear_mps_cache, load_yolo_model, preprocess_image,
     plot_metrics, plot_detection_results, detect_all_cells_comprehensive,
-    visualize_all_cells
+    visualize_all_cells, enhance_cell_detection, create_cell_specific_visualizations
 )
 from utils import (
     load_css, validate_dataset, get_image_transform, check_image_quality,
-    gradient_text, plot_cell_distribution, generate_report
+    gradient_text, plot_cell_distribution, generate_report,
+    generate_advanced_report, save_cell_specific_images
 )
 
 # Import AI agents if available
@@ -276,7 +277,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Image input section
+# Image input and analysis section
 col1, col2 = st.columns([3, 2])
 
 with col1:
@@ -285,10 +286,113 @@ with col1:
         <div style="text-align: center; margin-bottom: 1rem;">
             <div style="font-size: 1.5rem; margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: center;">📁</div>
             <h4 style="color: #2d3748; margin: 0; font-weight: 700; font-family: 'Inter', sans-serif; font-size: 1.1rem;">Upload Blood Smear Image</h4>
-            <p style="color: #4a5568; margin: 0.3rem 0 0 0; font-size: 0.85rem; font-weight: 500;">Upload a blood smear image for cell analysis</p>
+            <p style="color: #4a5568; margin: 0.3rem 0 0 0; font-size: 0.85rem; font-weight: 500;">Upload a blood smear image for detailed cell analysis</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    uploaded_file = st.file_uploader("Choose a blood smear image...", type=["jpg", "jpeg", "png"])
+    if uploaded_file is not None:
+        try:
+            # Read and process the image
+            file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+            image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            
+            if image is not None:
+                # Create three columns for different cell type visualizations
+                st.markdown("### Cell Type Detection Results")
+                viz_col1, viz_col2, viz_col3 = st.columns(3)
+                
+                with st.spinner("Analyzing blood cells..."):
+                    # Perform enhanced detection
+                    detections = enhance_cell_detection(image)
+                    
+                    if detections is not None:
+                        # Generate cell-specific visualizations
+                        visualizations = create_cell_specific_visualizations(image, detections)
+                        
+                        if visualizations is not None:
+                            # Save visualizations
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            saved_paths = save_cell_specific_images(visualizations, f"detection_{timestamp}")
+                            
+                            # Display cell-specific images
+                            with viz_col1:
+                                st.markdown("#### RBC Detection")
+                                st.image(visualizations['RBC_visualization'], 
+                                       caption=f"RBCs Detected: {detections['stats']['RBC_count']}", 
+                                       use_column_width=True)
+                            
+                            with viz_col2:
+                                st.markdown("#### WBC Detection")
+                                st.image(visualizations['WBC_visualization'], 
+                                       caption=f"WBCs Detected: {detections['stats']['WBC_count']}", 
+                                       use_column_width=True)
+                            
+                            with viz_col3:
+                                st.markdown("#### Platelet Detection")
+                                st.image(visualizations['Platelet_visualization'], 
+                                       caption=f"Platelets Detected: {detections['stats']['Platelet_count']}", 
+                                       use_column_width=True)
+                            
+                            # Generate advanced report
+                            report_data = generate_advanced_report(detections, uploaded_file.name)
+                            
+                            if report_data is not None:
+                                st.markdown("### Analysis Report")
+                                
+                                # Display report metrics
+                                metrics_col1, metrics_col2 = st.columns(2)
+                                
+                                with metrics_col1:
+                                    st.image(report_data['visualization_paths']['distribution_pie'], 
+                                           caption="Cell Type Distribution", 
+                                           use_column_width=True)
+                                
+                                with metrics_col2:
+                                    st.image(report_data['visualization_paths']['confidence_radar'], 
+                                           caption="Detection Confidence by Cell Type", 
+                                           use_column_width=True)
+                                
+                                # Display detailed metrics
+                                st.markdown("#### Detailed Cell Counts")
+                                st.image(report_data['visualization_paths']['metrics_bar'], 
+                                       caption="Cell Counts by Type", 
+                                       use_column_width=True)
+                                
+                                # Add download buttons for report and visualizations
+                                st.markdown("### Download Results")
+                                col1, col2, col3 = st.columns(3)
+                                
+                                with col1:
+                                    with open(report_data['report_path'], 'rb') as f:
+                                        st.download_button(
+                                            label="Download Detailed Report",
+                                            data=f,
+                                            file_name="blood_cell_analysis_report.txt",
+                                            mime="text/plain"
+                                        )
+                                
+                                with col2:
+                                    for viz_path in saved_paths.values():
+                                        with open(viz_path, 'rb') as f:
+                                            st.download_button(
+                                                label=f"Download {os.path.basename(viz_path)}",
+                                                data=f,
+                                                file_name=os.path.basename(viz_path),
+                                                mime="image/png"
+                                            )
+                        else:
+                            st.error("Error generating visualizations")
+                    else:
+                        st.error("Error during cell detection")
+            else:
+                st.error("Error reading the uploaded image")
+                
+        except Exception as e:
+            st.error(f"Error processing image: {str(e)}")
+            if debug_mode:
+                st.exception(e)
     
     image = None
     
