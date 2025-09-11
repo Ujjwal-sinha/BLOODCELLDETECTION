@@ -369,67 +369,66 @@ if uploaded_file is not None:
             # Show the original image
             st.image(st.session_state.current_image, caption="Uploaded Blood Smear Image", use_column_width=True)
             
-            # Add a button to start analysis
-            if st.button("Start Analysis"):
-                # Process the image and generate report
-                results = process_blood_cell_image(st.session_state.current_image)
-                if not results:
-                    st.error("Could not process the image. Please try a different image.")
-                else:
-                    detections, saved_paths = results
-                    if detections and saved_paths:
-                        # Generate and display report
-                        report_data = generate_advanced_report(detections, uploaded_file.name)
-                        if report_data:
-                            # Display report metrics
-                            metrics_col1, metrics_col2 = st.columns(2)
-                            
-                            with metrics_col1:
-                                if 'visualization_paths' in report_data and 'distribution_pie' in report_data['visualization_paths']:
-                                    st.image(report_data['visualization_paths']['distribution_pie'], 
-                                           caption="Cell Type Distribution", 
-                                           use_column_width=True)
-                            
-                            with metrics_col2:
-                                if 'visualization_paths' in report_data and 'confidence_radar' in report_data['visualization_paths']:
-                                    st.image(report_data['visualization_paths']['confidence_radar'], 
-                                           caption="Detection Confidence by Cell Type", 
-                                           use_column_width=True)
-                            
-                            if 'visualization_paths' in report_data and 'metrics_bar' in report_data['visualization_paths']:
-                                st.markdown("#### Detailed Cell Counts")
-                                st.image(report_data['visualization_paths']['metrics_bar'], 
-                                       caption="Cell Counts by Type", 
+            # Automatically start analysis
+            # Process the image and generate report
+            results = process_blood_cell_image(st.session_state.current_image)
+            if not results:
+                st.error("Could not process the image. Please try a different image.")
+            else:
+                detections, saved_paths = results
+                if detections and saved_paths:
+                    # Generate and display report
+                    report_data = generate_advanced_report(detections, uploaded_file.name)
+                    if report_data:
+                        # Display report metrics
+                        metrics_col1, metrics_col2 = st.columns(2)
+                        
+                        with metrics_col1:
+                            if 'visualization_paths' in report_data and 'distribution_pie' in report_data['visualization_paths']:
+                                st.image(report_data['visualization_paths']['distribution_pie'], 
+                                       caption="Cell Type Distribution", 
                                        use_column_width=True)
-                            
-                            # Add download section
-                            st.markdown("### Download Results")
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                if 'report_path' in report_data:
-                                    with open(report_data['report_path'], 'rb') as f:
+                        
+                        with metrics_col2:
+                            if 'visualization_paths' in report_data and 'confidence_radar' in report_data['visualization_paths']:
+                                st.image(report_data['visualization_paths']['confidence_radar'], 
+                                       caption="Detection Confidence by Cell Type", 
+                                       use_column_width=True)
+                        
+                        if 'visualization_paths' in report_data and 'metrics_bar' in report_data['visualization_paths']:
+                            st.markdown("#### Detailed Cell Counts")
+                            st.image(report_data['visualization_paths']['metrics_bar'], 
+                                   caption="Cell Counts by Type", 
+                                   use_column_width=True)
+                        
+                        # Add download section
+                        st.markdown("### Download Results")
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            if 'report_path' in report_data:
+                                with open(report_data['report_path'], 'rb') as f:
+                                    st.download_button(
+                                        label="📄 Download Detailed Report",
+                                        data=f,
+                                        file_name="blood_cell_analysis_report.txt",
+                                        mime="text/plain"
+                                    )
+                        
+                        with col2:
+                            for viz_type, viz_path in saved_paths.items():
+                                if os.path.exists(viz_path):
+                                    with open(viz_path, 'rb') as f:
                                         st.download_button(
-                                            label="📄 Download Detailed Report",
+                                            label=f"📊 Download {viz_type.replace('_', ' ')}",
                                             data=f,
-                                            file_name="blood_cell_analysis_report.txt",
-                                            mime="text/plain"
+                                            file_name=f"{viz_type}_{uploaded_file.name}",
+                                            mime="image/png"
                                         )
-                            
-                            with col2:
-                                for viz_type, viz_path in saved_paths.items():
-                                    if os.path.exists(viz_path):
-                                        with open(viz_path, 'rb') as f:
-                                            st.download_button(
-                                                label=f"📊 Download {viz_type.replace('_', ' ')}",
-                                                data=f,
-                                                file_name=f"{viz_type}_{uploaded_file.name}",
-                                                mime="image/png"
-                                            )
-                        else:
-                            st.warning("Could not generate the analysis report. The detection results are still valid.")
                     else:
-                        st.error("Error generating visualizations")
+                        st.warning("Could not generate the analysis report. The detection results are still valid.")
+                else:
+                    st.error("Error generating visualizations")
     except Exception as e:
         st.error(f"Error processing image: {str(e)}")
         if debug_mode:

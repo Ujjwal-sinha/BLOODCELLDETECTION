@@ -418,33 +418,55 @@ class BloodCellAIAgent:
         
         # Create analysis prompt
         prompt = f"""
-        Analyze this blood sample comprehensively as a hematology expert:
-        
-        Image Description: {image_description}
-        Detected Cells: {', '.join(detected_cells)}
-        Confidence Scores: {', '.join([f'{c:.2f}' for c in confidences])}
-        Count Data: {json.dumps(count_data, indent=2)}
-        Morphology Notes: {morphology}
-        
-        Provide detailed analysis following this structure:
-        1. General Overview of Sample Quality
-        2. Cell Count Analysis:
-           - RBC Analysis (normal range: 4.5-5.5 million/μL)
-           - WBC Analysis (normal range: 4,500-11,000/μL)
-           - Platelet Analysis (normal range: 150,000-450,000/μL)
-        3. Cell Distribution Assessment
-        4. Potential Clinical Implications
-        5. Risk Factors and Warning Signs
-        6. Recommended Additional Tests
-        7. Treatment Suggestions (if applicable)
-        8. Follow-up Recommendations
-        
-        Provide a detailed analysis including:
-        1. Cell type identification
-        2. Morphology assessment
-        3. Count analysis
-        4. Abnormality detection
-        5. Clinical implications
+        You are a world-class hematologist AI. Your task is to provide a detailed, professional, and insightful analysis of a blood smear image based on the provided data.
+
+        **Patient Data:**
+        - **Image Description:** {image_description}
+        - **Morphology Notes:** {morphology}
+        - **Count Data:** {json.dumps(count_data, indent=2)}
+
+        **Analysis Request:**
+        Generate a comprehensive hematology report. The report must be structured, clear, and provide actionable insights. Follow the structure below precisely.
+
+        **--- COMPREHENSIVE HEMATOLOGY REPORT ---**
+
+        **1. OVERVIEW & SAMPLE QUALITY:**
+           - Briefly summarize the overall findings.
+           - Comment on the sample quality based on the image description (e.g., "clear, well-stained smear," "presence of artifacts").
+
+        **2. DETAILED CELLULAR ANALYSIS:**
+
+           **A. Red Blood Cells (RBCs):**
+              - **Count:** {count_data.get('RBC_count', 'N/A')}
+              - **Morphology & Characteristics:** Analyze RBC size (normocytic, microcytic, macrocytic), shape (e.g., biconcave, sickle, spherical), and color (normochromic, hypochromic).
+              - **Clinical Significance:** Based on the count and morphology, what are the potential implications? (e.g., "Normal count and morphology suggest no signs of anemia.", "Microcytic, hypochromic cells may indicate iron deficiency anemia.").
+
+           **B. White Blood Cells (WBCs):**
+              - **Count:** {count_data.get('WBC_count', 'N/A')}
+              - **Morphology & Shape Analysis:** Analyze WBC characteristics. Use the shape analysis data:
+                 - **Average Aspect Ratio:** {count_data.get('shape_analysis', {{}}).get('wbc', {{}}).get('avg_aspect_ratio', 'N/A'):.2f} (Note: 1.0 is perfectly round).
+                 - **Average Solidity:** {count_data.get('shape_analysis', {{}}).get('wbc', {{}}).get('avg_solidity', 'N/A'):.2f} (Note: 1.0 is a perfect convex shape).
+              - **Clinical Significance:** Interpret the WBC count and morphology. (e.g., "Elevated WBC count with immature forms may suggest infection or a leukemoid reaction.", "Normal count and morphology.").
+
+           **C. Platelets:**
+              - **Count:** {count_data.get('Platelet_count', 'N/A')}
+              - **Morphology & Distribution:** Analyze platelet size, shape, and whether they appear clumped or evenly distributed.
+                 - **Average Aspect Ratio:** {count_data.get('shape_analysis', {{}}).get('platelets', {{}}).get('avg_aspect_ratio', 'N/A'):.2f}
+              - **Clinical Significance:** What does the platelet count and appearance suggest? (e.g., "Low platelet count (thrombocytopenia) increases risk of bleeding.", "Platelet clumping can be an artifact or indicate activation.").
+
+        **3. KEY FINDINGS & ABNORMALITIES:**
+           - Bullet-point list of the most critical findings from the analysis.
+           - Example: "- Marked anisopoikilocytosis of RBCs.", "- Presence of atypical lymphocytes."
+
+        **4. POTENTIAL CLINICAL IMPLICATIONS & RISK ASSESSMENT:**
+           - Synthesize the findings to assess potential health risks.
+           - Discuss possible conditions or diseases indicated by the results (e.g., anemia, infection, clotting disorders).
+
+        **5. RECOMMENDATIONS:**
+           - **Further Tests:** Suggest specific follow-up tests (e.g., "Complete Blood Count (CBC) with differential," "Iron studies," "Bone marrow biopsy if abnormalities are severe.").
+           - **Clinical Actions:** Recommend actions for the healthcare provider (e.g., "Monitor patient for signs of infection," "Referral to a hematologist for further evaluation.").
+
+        **--- END OF REPORT ---**
         """
         
         try:
